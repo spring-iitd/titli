@@ -1,0 +1,21 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+
+### Added
+- Kitsune that outputs pkl and pth models
+- Feature 2
+
+### Changed
+- Updated something
+
+### Fixed
+- Bug 1
+- Bug 2
+
+## [1.0.0] - YYYY-MM-DD
+
+### Added
+- Initial release
