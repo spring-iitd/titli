@@ -72,7 +72,7 @@ class BaseAutoencoder(nn.Module):
 
 
 class TorchKitNET(nn.Module):
-    def __init__(self, clusters):
+    def __init__(self, clusters: list, norms_path: str):
         super(TorchKitNET, self).__init__()
         self.dataset = "PcapDatasetRaw"
         self.input_dim = 100
@@ -82,7 +82,7 @@ class TorchKitNET(nn.Module):
         self.rmse = RMSELoss()
         self.tails = nn.ModuleList([BaseAutoencoder(len(c), int(np.ceil(len(c) * self.hr))) for c in clusters])
         self.head = BaseAutoencoder(len(clusters), int(np.ceil(len(clusters) * self.hr)))
-        with open("norm_params.pkl", "rb") as f:
+        with open(norms_path, "rb") as f:
             self.norm_params = pickle.load(f)
 
     def forward(self, x):
