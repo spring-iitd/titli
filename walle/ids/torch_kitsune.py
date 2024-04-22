@@ -55,7 +55,7 @@ class BaseAutoencoder(nn.Module):
         return x
 
 
-class Kitsune(nn.Module):
+class Torch_Kitsune(nn.Module):
 
     def __init__(self, **kwargs):
         self._feature_mapper()
@@ -64,8 +64,9 @@ class Kitsune(nn.Module):
         self.hidden_rate = 0.75
         self.FMgrace_rate = 0.2
         self.train_mode = False
+        self.num_features = kwargs["num_features"]
         super().__init__(**kwargs)
-        self.FM = CC.corClust(100)
+        self.FM = CC.corClust(self.num_features)
 
     def _feature_mapper(self, x: torch.Tensor=None) -> None:
         # self.clusters = [
@@ -160,7 +161,7 @@ class Kitsune(nn.Module):
         return x
     
     def forward(self, x):
-        x = x.reshape(-1, 100)
+        x = x.reshape(-1, self.num_features)
         # print(x.shape)
 
         x_clusters = []
