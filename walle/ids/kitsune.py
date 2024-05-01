@@ -5,21 +5,37 @@ import numpy as np
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, to_tree
 
-from walle.ids.pytorch_kitsune import _TorchKitNET
+from walle.ids.torch_kitnet import _TorchKitNET # type: ignore
 
 class KitNET:
     """    
-        # n: the number of features in your input dataset (i.e., x \in R^n)
-        # m: the maximum size of any autoencoder in the ensemble layer
-        # AD_grace_period: the number of instances the network will learn from before producing anomaly scores
-        # FM_grace_period: the number of instances which will be taken to learn the feature mapping. If 'None', then FM_grace_period=AM_grace_period
-        # learning_rate: the default stochastic gradient descent learning rate for all autoencoders in the KitNET instance.
-        # hidden_ratio: the default ratio of hidden to visible neurons. E.g., 0.75 will cause roughly a 25% compression in the hidden layer.
-        # feature_map: One may optionally provide a feature map instead of learning one. The map must be a list,
-        #           where the i-th entry contains a list of the feature indices to be assingned to the i-th autoencoder in the ensemble.
-        #           For example, [[2,5,3],[4,0,1],[6,7]]
+        n                   : the number of features in your input dataset (i.e., x \in R^n)
+        max_autoencoder_size: the maximum size of any autoencoder in the ensemble layer
+        FM_grace_period     : the number of instances which will be taken to learn the feature mapping.
+                              If 'None', then FM_grace_period=AM_grace_period
+        AD_grace_period     : the number of instances the network will learn from before producing
+                              anomaly scores
+        learning_rate       : stochastic gradient descent learning rate for all autoencoders.
+        hidden_ratio        : the default ratio of hidden to visible neurons.
+        feature_map         : One may optionally provide a feature map instead of learning one. The map must be
+                              a list, where the i-th entry contains a list of the feature indices to be assingned
+                              to the i-th autoencoder in the ensemble. For example, [[2,5,3],[4,0,1],[6,7]]
+        normalize           : boolean, whether to 0-1 normalize the input data (default: True)
+        input_precision     : integer, number of significant figures in the input data
+        quantize            : boolean, whether to quantize the input data (default: None)
+        model_path          : path to save the model
     """
-    def __init__(self, n, max_autoencoder_size=10, FM_grace_period=None, AD_grace_period=10000, learning_rate=0.1, hidden_ratio=0.75, feature_map=None, normalize=True, input_precision=None, quantize=None):
+    def __init__(self, n,
+                 max_autoencoder_size=10,
+                 FM_grace_period=None,
+                 AD_grace_period=10000,
+                 learning_rate=0.1,
+                 hidden_ratio=0.75,
+                 feature_map=None,
+                 normalize=True,
+                 input_precision=None,
+                 quantize=None,
+                 model_path="kitsune.pkl"):
 
         self.AD_grace_period = AD_grace_period
         if FM_grace_period is None:
@@ -42,18 +58,21 @@ class KitNET:
         self.ensembleLayer = []
         self.outputLayer = None
         self.quantize = quantize
+        self.model_path = model_path
+        self.norm_params_path = model_path.replace(".pkl", "_norm_params.pkl")
         if self.v is None:
             pass
             print("Feature-Mapper: train-mode, Anomaly-Detector: off-mode")
         else:
             self.__createAD__()
             print("Feature-Mapper: execute-mode, Anomaly-Detector: train-mode")
-        # incremental feature cluatering for the feature mapping process
+        # incremental feature clustering for the feature mapping process
         self.FM = corClust(self.n)
 
     def process(self, x):
         """
-        If FM_grace_period+AM_grace_period has passed, then this function executes KitNET on x. Otherwise, this function learns from x.
+        If FM_grace_period+AM_grace_period has passed, then this function executes KitNET on x.
+        Otherwise, this function learns from x.
         x: a np array of length n
         Note: KitNET automatically performs 0-1 normalization on all attributes.
         """
@@ -80,9 +99,17 @@ class KitNET:
         """
         return np.array([self.process(x[i]) for i in range(np.array(x).shape[0])])
 
-    # force train KitNET on x
-    # returns the anomaly score of x during training (do not use for alerting)
     def train(self, x):
+        """
+    Trains the model on instance 'x'. Updates the correlation matrix during the grace period, 
+    trains the ensemble and output layers otherwise. Also saves the min and max norms to a file.
+
+    Parameters:
+    x (numpy array): The instance for training.
+
+    Returns:
+    None
+    """
         # If the FM is in train-mode, and the user has not supplied a feature mapping
         if self.n_trained <= self.FM_grace_period and self.v is None:
             # update the incremetnal correlation matrix
@@ -90,7 +117,8 @@ class KitNET:
             if self.n_trained == self.FM_grace_period:  # If the feature mapping should be instantiated
                 self.v = self.FM.cluster(self.m)
                 self.__createAD__()
-                print("The Feature-Mapper found a mapping: "+str(self.n)+" features to "+str(len(self.v))+" autoencoders.")
+                print("The Feature-Mapper found a mapping: "+str(self.n)+ \
+                      " features to "+str(len(self.v))+" autoencoders.")
                 print("Feature-Mapper: execute-mode, Anomaly-Detector: train-mode")
         else:  # train
             # Ensemble Layer
@@ -100,7 +128,7 @@ class KitNET:
                 xi = x[self.v[a]]
                 S_l1[a] = self.ensembleLayer[a].train(xi)
             # OutputLayer
-            re = self.outputLayer.train(S_l1)
+            rmse = self.outputLayer.train(S_l1)
 
             """save ensemble and output layer norms"""
             norm_params = {}
@@ -111,7 +139,7 @@ class KitNET:
             norm_params["norm_min_output"] = self.outputLayer.norm_min
             norm_params["norm_max_output"] = self.outputLayer.norm_max
 
-            with open('norm_params.pkl', 'wb') as f:
+            with open(self.norm_params_path, 'wb') as f:
                 pickle.dump(norm_params, f)
 
             if self.n_trained == self.AD_grace_period + self.FM_grace_period:
@@ -119,11 +147,11 @@ class KitNET:
                 print("Feature-Mapper: execute-mode, Anomaly-Detector: execute-mode")
         self.n_trained += 1
 
-    # force execute KitNET on x
     def execute(self, x):
         if self.v is None:
             raise RuntimeError(
-                'KitNET Cannot execute x, because a feature mapping has not yet been learned or provided. Try running process(x) instead.')
+                'KitNET Cannot execute x, because a feature mapping has not yet been learned \
+                 or provided. Try running process(x) instead.')
         else:
             self.n_executed += 1
             # Ensemble Layer
@@ -139,7 +167,8 @@ class KitNET:
         # construct ensemble layer
         for map in self.v:
             params = dA_params(n_visible=len(map), n_hidden=0, lr=self.lr, corruption_level=0, gracePeriod=0,
-                                  hiddenRatio=self.hr, normalize=self.normalize, input_precision=self.input_precision, quantize=self.quantize)
+                                  hiddenRatio=self.hr, normalize=self.normalize,
+                                  input_precision=self.input_precision, quantize=self.quantize)
             self.ensembleLayer.append(dA(params))
 
         # construct output layer
@@ -161,9 +190,9 @@ class KitNET:
 
     def get_torch_model(self):
         weights = self.get_params()
-        model = _TorchKitNET(weights["ensemble"], weights["output"], self.v)
-        torch.save(model.state_dict(), "kitsune.pth")
-
+        model = _TorchKitNET(weights["ensemble"], weights["output"], self.v, self.n)
+        path = self.model_path.replace(".pkl", ".pth")
+        torch.save(model.state_dict(), path)
 
 def squeeze_features(fv, precision):
     """rounds features to siginificant figures
@@ -190,7 +219,16 @@ def quantize_weights(w, k):
 
 
 class dA_params:
-    def __init__(self, n_visible=5, n_hidden=3, lr=0.001, corruption_level=0.0, gracePeriod=10000, hiddenRatio=None, normalize=True, input_precision=None, quantize=None):
+    def __init__(self, n_visible=5,
+                 n_hidden=3,
+                 lr=0.001,
+                 corruption_level=0.0,
+                 gracePeriod=10000,
+                 hiddenRatio=None,
+                 normalize=True,
+                 input_precision=None,
+                 quantize=None):
+
         self.n_visible = n_visible  # num of units in visible (input) layer
         self.n_hidden = n_hidden  # num of units in hidden layer
         self.lr = lr
@@ -259,11 +297,6 @@ class dA:
             # 0-1 normalize
             x = (x - self.norm_min) / (self.norm_max -
                                        self.norm_min + 0.0000000000000001)
-
-            
-            # save the normalization parameters
-            # with open('norm_params_head.pkl', 'wb') as f:
-            #     pickle.dump({'max': self.norm_max, 'min': self.norm_min}, f)
 
         if self.params.input_precision:
             x=squeeze_features(x,self.params.input_precision)
@@ -392,9 +425,12 @@ class rollmean:
 
 class corClust:
     """
-        # A helper class for KitNET which performs a correlation-based incremental clustering of the dimensions in X
+        A helper class for KitNET which performs a correlation-based incremental 
+        clustering of the dimensions in X
+
         # n: the number of dimensions in the dataset
-        # For more information and citation, please see our NDSS'18 paper: Kitsune: An Ensemble of Autoencoders for Online Network Intrusion Detection
+        # For more information and citation, please see our NDSS'18 paper:
+        Kitsune: An Ensemble of Autoencoders for Online Network Intrusion Detection
     """
     def __init__(self,n):
         #parameter:

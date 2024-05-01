@@ -1,9 +1,9 @@
 from .kitsune import KitNET
-from .pytorch_kitsune import TorchKitNET
-from .torch_kitsune import Torch_Kitsune
+from .torch_kitnet import TorchKitNET
+from .pytorch_kitsune import PyTorchKitsune
 
 __all__ = [
     'KitNET',
     'TorchKitNET',
-    'Torch_Kitsune'
+    'PyTorchKitsune'
 ]
