@@ -4,7 +4,7 @@ setup(
     name='walle',
     version='0.0.1',
     description='A library for collection of IDS and tools for evaluating them',
-    long_description=open("README.md").read() + '\n\n' + open("CHANGELOG.txt").read(),
+    long_description=open("README.md").read(),
     long_description_content_type = "text/markdown",
     url='https://github.com/spg-iitd/raids',
     packages=find_packages(),
