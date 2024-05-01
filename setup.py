@@ -25,7 +25,7 @@ setup(
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "Topic :: Security :: Intrusion Detection",
+        "Topic :: Security",
     ],
     zip_safe=False,
     python_requires='>=3.10',
