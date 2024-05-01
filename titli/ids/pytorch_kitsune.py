@@ -11,8 +11,9 @@ from typing import Any
 from scapy.all import *
 
 
-import walle.fe.corClust as CC
-from walle.fe.after_image import AfterImage, NetStat
+import titli.fe.corClust as CC
+from titli.fe import AfterImage, NetStat
+
 import matplotlib.pyplot as plt
 
 class RMSELoss(nn.Module):

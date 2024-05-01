@@ -3,8 +3,8 @@ import numpy as np
 
 from scapy.all import *
 
-from walle.fe import AfterImage, NetStat
-from walle.ids import KitNET
+from titli.fe import AfterImage, NetStat
+from titli.ids import KitNET
 
 import matplotlib.pyplot as plt
 

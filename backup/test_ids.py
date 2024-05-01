@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 from scapy.all import *
 
-from walle.fe import AfterImage, NetStat
-from walle.ids import TorchKitNET
-from walle.utils import RMSELoss
+from titli.fe import AfterImage, NetStat
+from titli.ids import TorchKitNET
+from titli.utils import RMSELoss
 
 # Read the pcap file using scapy
 PCAP_PATH = "../PANDA/PANDA/data/benign/weekday.pcap"

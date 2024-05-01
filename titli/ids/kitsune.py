@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats import norm
 from scipy.cluster.hierarchy import linkage, to_tree
 
-from walle.ids.torch_kitnet import _TorchKitNET # type: ignore
+from titli.ids.torch_kitnet import _TorchKitNET # type: ignore
 
 class KitNET:
     """    
