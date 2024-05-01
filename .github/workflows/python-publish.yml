@@ -9,6 +9,9 @@
 name: Publish to PyPI and TestPyPI
 
 on:
+  push:
+    branches:
+      - main
   release:
     types: [published]
   workflow_dispatch:
