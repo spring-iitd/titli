@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='walle',
+    name='walle-ids',
     version='0.0.1',
     description='A library for collection of IDS and tools for evaluating them',
     long_description=open("README.md").read(),
