@@ -79,7 +79,6 @@ class TorchKitNET(nn.Module):
         super(TorchKitNET, self).__init__()
         self.dataset = "PcapDatasetRaw"
         self.input_dim = sum([len(c) for c in clusters])
-        self.raw = True
         self.hr = 0.75
         self.clusters = clusters
         self.rmse = RMSELoss()
@@ -89,13 +88,12 @@ class TorchKitNET(nn.Module):
             self.norm_params = pickle.load(f)
 
     def forward(self, x):
-        x = torch.tensor(x)
         x = x.view(-1, self.input_dim)
 
         x_clusters = []
         for c in self.clusters:
-            norm_max = self.norm_params[f"norm_max_{c[0]}"]
-            norm_min = self.norm_params[f"norm_min_{c[0]}"]
+            norm_max = torch.tensor(self.norm_params[f"norm_max_{c[0]}"])
+            norm_min = torch.tensor(self.norm_params[f"norm_min_{c[0]}"])
 
             x_cluster = torch.index_select(x, 1, torch.tensor(c))
             x_cluster = (x_cluster - norm_min) / (norm_max - norm_min + 0.0000000000000001)
