@@ -1,4 +1,4 @@
-from walle.ids import PyTorchKitsune
+from titli.ids import PyTorchKitsune
 
 model = PyTorchKitsune(num_features=100)
 threshold = model.train(pcap_path="../PANDA/PANDA/data/benign/weekday.pcap")

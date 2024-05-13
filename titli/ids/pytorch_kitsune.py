@@ -143,6 +143,7 @@ class PyTorchKitsune(nn.Module):
         self.device = torch.device("mps" if torch.cuda.is_available() else "cpu")
         self.rmse = RMSELoss()
         self.FMgrace = np.floor(self.FMgrace_rate * len(rdpcap(pcap_path)))
+        self.dataset = pcap_path.split("/")[-1].split(".")[0]
         
         print("Training Feature Mapping (FM) phase")
         for i, packet in enumerate(PcapReader(pcap_path)):
@@ -179,10 +180,15 @@ class PyTorchKitsune(nn.Module):
             loss.backward()
             optimiser.step()
 
-            # Making the decoder weight the transpose of the encoder weight
+            # # Making the decoder weight the transpose of the encoder weight
+            # for tail in self.tails:
+            #     tail.decoder.weight.data = tail.encoder.weight.data.t()
+            # self.head.decoder.weight.data = self.head.encoder.weight.data.t()
+
+            # Making the encoder weight the transpose of the decoder weight
             for tail in self.tails:
-                tail.decoder.weight.data = tail.encoder.weight.data.t()
-            self.head.decoder.weight.data = self.head.encoder.weight.data.t()
+                tail.encoder.weight.data = tail.decoder.weight.data.t()
+            self.head.encoder.weight.data = self.head.decoder.weight.data.t()
 
             if (i + 1) % self.print_interval == 0:
                 print(f"Packet: {i} | Loss: {loss.data}")
@@ -212,6 +218,8 @@ class PyTorchKitsune(nn.Module):
 
             # loss
             loss = self.rmse(x_hat, tails)
+            if loss.data == 0:
+                loss.data = torch.tensor(1e-2)
             self.threshold_rmse.append(loss.data)
 
         log_re = np.log(self.threshold_rmse)
@@ -244,33 +252,29 @@ class PyTorchKitsune(nn.Module):
 
             # loss
             loss = self.rmse(x_hat, tails)
+            if loss.data == 0:
+                loss.data = torch.tensor(1e-2)
             self.rmse_array.append(loss.data)
 
             if (i + 1) % self.print_interval == 0:
                 print(f"Inferencing: {i} | Loss: {loss.data}")
 
-    def plot_kitsune(self,threshold,plot_with_time = True, meta_file = False, out_image = "kitsune_plot.png"):
-        cmap = plt.get_cmap('Set3')
+    def plot_kitsune(self, threshold, out_image = "kitsune_plot.png"):
+        _ = plt.get_cmap('Set3')
 
-        f, ax1 = plt.subplots(constrained_layout=True, figsize=(10, 5), dpi=200)
+        f, ax1 = plt.subplots(constrained_layout=True, figsize=(10, 5), dpi=600)
+        x_val = np.arange(len(self.rmse_array))
 
-        if plot_with_time:
-            x_val = range(len(self.rmse_array))
-            ax1.xaxis.set_major_locator(ticker.MultipleLocator(0.85))
-            ax1.tick_params(labelrotation=90)
-        else:
-            x_val = range(len(self.rmse_array))
-
-        if meta_file:
+        try:
             ax1.scatter(x_val, self.rmse_array, s=1, c='#00008B')
-        else:
+        except:
             ax1.scatter(x_val, self.rmse_array, s=1, alpha=1.0, c='#FF8C00')
 
-        ax1.axhline(y=threshold, color='r', linestyle='-')
+        ax1.axhline(y=threshold, color='b', linestyle='-')
         ax1.set_yscale("log")
-        ax1.set_title("Anomaly Scores from Kitsune Execution Phase")
-        ax1.set_ylabel("RMSE (log scaled)")
-        ax1.set_xlabel("packet index")
+        ax1.set_title(f"Anomaly Scores of Kitsune Execution Phase: {self.dataset}")
+        ax1.set_ylabel("RMSE")
+        ax1.set_xlabel("Packet Index")
 
         f.savefig(out_image)
         print("plot path:", out_image)

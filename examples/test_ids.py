@@ -72,7 +72,7 @@ try:
 except:
     ax1.scatter(x_val, anomaly_scores, s=1, alpha=1.0, c='#FF8C00')
 
-ax1.axhline(y=threshold, color='r', linestyle='-')
+ax1.axhline(y=threshold, color='b', linestyle='-')
 ax1.set_yscale("log")
 ax1.set_title("Anomaly Scores from Kitsune Execution Phase")
 ax1.set_ylabel("RMSE (log scaled)")
