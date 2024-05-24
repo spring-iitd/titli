@@ -92,10 +92,10 @@ class TorchKitNET(nn.Module):
 
         x_clusters = []
         for c in self.clusters:
-            norm_max = torch.tensor(self.norm_params[f"norm_max_{c[0]}"])
-            norm_min = torch.tensor(self.norm_params[f"norm_min_{c[0]}"])
+            norm_max = torch.tensor(self.norm_params[f"norm_max_{c[0]}"]).to(x.device)
+            norm_min = torch.tensor(self.norm_params[f"norm_min_{c[0]}"]).to(x.device)
 
-            x_cluster = torch.index_select(x, 1, torch.tensor(c))
+            x_cluster = torch.index_select(x, 1, torch.tensor(c).to(x.device))
             x_cluster = (x_cluster - norm_min) / (norm_max - norm_min + 0.0000000000000001)
             x_cluster = x_cluster.float()
 
@@ -114,10 +114,11 @@ class TorchKitNET(nn.Module):
         tails = torch.stack(tail_losses)
 
         # nomalize the tails
-        norm_max = torch.tensor(self.norm_params["norm_max_output"])
-        norm_min = torch.tensor(self.norm_params["norm_min_output"])
+        norm_max = torch.tensor(self.norm_params["norm_max_output"]).to(x.device)
+        norm_min = torch.tensor(self.norm_params["norm_min_output"]).to(x.device)
         tails = (tails - norm_min) / (norm_max - norm_min + 0.0000000000000001)
         tails = tails.float()
         x = self.head(tails)
 
         return x, tails
+
