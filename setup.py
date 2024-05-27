@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='titli',
-    version='0.0.3',
+    version='0.0.4',
     description='A library for collection of IDS and tools for evaluating them',
     long_description=open("README.md").read(),
     long_description_content_type = "text/markdown",
