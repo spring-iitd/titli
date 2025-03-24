@@ -1,4 +1,4 @@
-from base_ids import BaseSKLearnModel
+from .base_ids import BaseSKLearnModel
 
 import torch
 import numpy as np
@@ -32,8 +32,8 @@ if __name__ == "__main__":
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     model.train(dataloader)
-    model.save_model(f"{model.__name__}_model.pkl")
-    model.load_model(f"{model.__name__}_model.pkl")
+    model.save_model(f"{model.__class__.__name__}_model.pkl")
+    model.load_model(f"{model.__class__.__name__}_model.pkl")
     y_test, y_pred = model.infer(dataloader)
 
     results = model.evaluate(y_test, y_pred)
