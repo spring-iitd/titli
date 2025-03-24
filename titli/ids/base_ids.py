@@ -12,9 +12,9 @@ from sklearn.metrics import (precision_score, recall_score,
                              accuracy_score, roc_curve, auc)
 
 class BaseSKLearnModel:
-    def __init__(self):
-        self.scaler = None
-        self.model = None
+    def __init__(self, scaler, model):
+        self.scaler = scaler
+        self.model = model
 
     def fit(self, X_train):
         X_train = self.scaler.fit_transform(X_train)
@@ -102,13 +102,62 @@ class BaseSKLearnModel:
         # Set tick labels properly (optional if needed for axes)
         ax.set_xticklabels(["Benign", "Malicious"])
         ax.set_yticklabels(["Benign", "Malicious"])
-
+        plt.savefig("confusion_matrix.png")
         plt.show()
         plt.close()
         # plt.savefig(cm_save_path)  # Save figure
         # plt.close()
         # print(f"Confusion matrix saved to {cm_save_path}")
             
+    # def compute_roc(self, test_loader):
+    #     """
+    #     Compute ROC Curve and AUC using the fitted model and scaler.
+    #     """
+    #     X_test, y_test = [], []
+    #     device = "cpu"
+    #     for inputs, labels in tqdm(test_loader, desc="Evaluating"):
+    #         inputs, labels = inputs.to(device), labels.to(device)
+    #         X_test.append(inputs.cpu().numpy())
+    #         y_test.append(labels.cpu().numpy())
+
+    #     X_test = np.vstack(X_test)
+    #     y_test = np.hstack(y_test)
+
+    #     # Transform the test data using the fitted scaler
+    #     # X_test_scaled = self.scaler.transform(X_test)
+
+    #     # Get decision scores
+    #     scores = self.model.decision_function(X_test)
+
+    #     # Binary prediction
+    #     y_pred = np.where(scores >= 0, 0, 1)  # 0=Normal, 1=Anomaly
+
+    #     # ROC Curve and AUC
+    #     fpr, tpr, thresholds = roc_curve(y_test, scores, pos_label=1)
+    #     roc_auc = auc(fpr, tpr)
+    #     print(f"AUC: {roc_auc:.4f}")
+
+    #     # EER Calculation
+    #     fnr = 1 - tpr
+    #     eer_threshold_index = np.nanargmin(np.absolute((fnr - fpr)))
+    #     eer_threshold = thresholds[eer_threshold_index]
+    #     eer = fpr[eer_threshold_index]
+    #     print(f"EER: {eer:.4f}")
+
+    #     # Save ROC Plot with EER annotation
+    #     plt.figure()
+    #     plt.plot(fpr, tpr, label=f"ROC curve (AUC = {roc_auc:.2f})")
+    #     plt.plot([0, 1], [0, 1], linestyle='--')
+    #     plt.scatter(fpr[eer_threshold_index], tpr[eer_threshold_index], color='red', label=f'EER = {eer:.2f}')
+    #     plt.xlabel("False Positive Rate")
+    #     plt.ylabel("True Positive Rate")
+    #     plt.legend(loc="lower right")
+    #     plt.title("ROC Curve")
+    #     plt.grid(True)
+    #     roc_filename = f"roc_curve.png"  # You can modify this with actual names if needed
+    #     plt.savefig(roc_filename)
+    #     plt.close()
+    #     print(f"ROC Curve saved to {roc_filename}")
 
     def save_model(self, model_path):
         with open(model_path, 'wb') as f:
