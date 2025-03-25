@@ -222,36 +222,22 @@ class PyTorchModel(nn.Module):
 
                 # Apply threshold to each sample's reconstruction error and create binary prediction
                 y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
-
-        return y_test , y_pred , reconstruction_errors
-    def evaluate(self,y_test, y_pred, reconstruction_errors,test_loader, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
+        
+        threshold_file = "reconstruction_error.pkl"
+        pickle.dump(reconstruction_errors, open(threshold_file, 'wb')); print(f"Threshold saved to {threshold_file}")
+        return y_test , y_pred
+    def evaluate(self,y_test, y_pred, test_loader, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
         """
         Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
         """
         with open("threshold.pkl", 'rb') as f:
             threshold = pickle.load(f)
+        with open("reconstruction_error.pkl", 'rb') as g:
+            reconstruction_errors = pickle.load(g)
         print("Using the threshold of {:.2f}".format(threshold))
         model = self.model
         model.eval()
     
-
-        # with torch.no_grad():
-        #     for inputs, labels in tqdm(test_loader, desc="Evaluating"):
-        #         inputs = inputs.to(device)
-        #         outputs = model(inputs)
-        #         loss = self.criterion(outputs, inputs)
-
-        #         # Compute the per-sample reconstruction error (assuming MSELoss)
-        #         sample_reconstruction_errors = (outputs - inputs).pow(2).mean(dim=1).cpu().numpy()  # per-sample error
-        #         reconstruction_errors.extend(sample_reconstruction_errors)
-        #         y_test.extend(labels.cpu().numpy())
-
-        #         # Apply threshold to each sample's reconstruction error and create binary prediction
-        #         y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
-
-        # Ensure lengths match
-
-        # Compute confusion matrix
         cm = confusion_matrix(y_test, y_pred)
 
         # Compute evaluation metrics
