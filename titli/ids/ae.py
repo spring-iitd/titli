@@ -73,6 +73,6 @@ if __name__ == "__main__":
     model.train_model(dataloader)
     model.save(model_path)
     model.load(Autoencoder, model_path)
-    
-    model.evaluate(dataloader)
+    y_test,y_pred, reconstruction_error = model.infer(dataloader)
+    model.evaluate(y_test,y_pred,reconstruction_error,dataloader)
 

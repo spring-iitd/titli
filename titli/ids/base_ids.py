@@ -172,9 +172,9 @@ class PyTorchModel(nn.Module):
         print(f"Model saved to {model_path}")
 
 
-    def load(self,model_class, model_path, input_size, device):
+    def load(self,model_class, model_path):
         # Create model instance with passed input_size and device
-        model = model_class(input_size=input_size, device=device)
+        model = model_class(input_size=self.input_size, device = self.device)
         checkpoint = torch.load(model_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
@@ -198,8 +198,33 @@ class PyTorchModel(nn.Module):
     
 
     
-    
-    def evaluate(self,test_loader, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
+    def infer(self, test_loader):
+        """
+        Infers on the test set and returns the true labels and predicted labels.
+        """
+        with open("threshold.pkl", 'rb') as f:
+            threshold = pickle.load(f)
+        print("Using the threshold of {:.2f}".format(threshold))
+        self.eval()
+        reconstruction_errors = []
+        y_test = []
+        y_pred = []
+
+        with torch.no_grad():
+            for inputs, labels in tqdm(test_loader, desc="Inferencing"):
+                inputs = inputs.to(self.device)
+                outputs = self(inputs)
+                loss = self.criterion(outputs, inputs)
+
+                sample_reconstruction_errors = (outputs - inputs).pow(2).mean(dim=1).cpu().numpy()  # per-sample error
+                reconstruction_errors.extend(sample_reconstruction_errors)
+                y_test.extend(labels.cpu().numpy())
+
+                # Apply threshold to each sample's reconstruction error and create binary prediction
+                y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
+
+        return y_test , y_pred , reconstruction_errors
+    def evaluate(self,y_test, y_pred, reconstruction_errors,test_loader, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
         """
         Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
         """
@@ -208,23 +233,21 @@ class PyTorchModel(nn.Module):
         print("Using the threshold of {:.2f}".format(threshold))
         model = self.model
         model.eval()
-        reconstruction_errors = []
-        y_test = []
-        y_pred = []
+    
 
-        with torch.no_grad():
-            for inputs, labels in tqdm(test_loader, desc="Evaluating"):
-                inputs = inputs.to(device)
-                outputs = model(inputs)
-                loss = self.criterion(outputs, inputs)
+        # with torch.no_grad():
+        #     for inputs, labels in tqdm(test_loader, desc="Evaluating"):
+        #         inputs = inputs.to(device)
+        #         outputs = model(inputs)
+        #         loss = self.criterion(outputs, inputs)
 
-                # Compute the per-sample reconstruction error (assuming MSELoss)
-                sample_reconstruction_errors = (outputs - inputs).pow(2).mean(dim=1).cpu().numpy()  # per-sample error
-                reconstruction_errors.extend(sample_reconstruction_errors)
-                y_test.extend(labels.cpu().numpy())
+        #         # Compute the per-sample reconstruction error (assuming MSELoss)
+        #         sample_reconstruction_errors = (outputs - inputs).pow(2).mean(dim=1).cpu().numpy()  # per-sample error
+        #         reconstruction_errors.extend(sample_reconstruction_errors)
+        #         y_test.extend(labels.cpu().numpy())
 
-                # Apply threshold to each sample's reconstruction error and create binary prediction
-                y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
+        #         # Apply threshold to each sample's reconstruction error and create binary prediction
+        #         y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
 
         # Ensure lengths match
 
