@@ -78,7 +78,7 @@ if __name__ == "__main__":
 
     # Load your data
     data = pd.read_csv("/home/kundan/byte-me/data/cic_csv/final_output.csv")
-
+    
     # data = pd.read_csv("/home/kundan/byte-me/data/cic_csv/cic-2023_chopped/Benign_Final/BenignTraffic.csv")
     
     feature, label = data.iloc[:, :-1].values, data.iloc[:, -1].values

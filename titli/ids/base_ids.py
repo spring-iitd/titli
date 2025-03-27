@@ -226,7 +226,7 @@ class PyTorchModel(nn.Module):
         threshold_file = "reconstruction_error.pkl"
         pickle.dump(reconstruction_errors, open(threshold_file, 'wb')); print(f"Threshold saved to {threshold_file}")
         return y_test , y_pred
-    def evaluate(self,y_test, y_pred, test_loader, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
+    def evaluate(self,y_test, y_pred, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
         """
         Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
         """
@@ -235,8 +235,6 @@ class PyTorchModel(nn.Module):
         with open("reconstruction_error.pkl", 'rb') as g:
             reconstruction_errors = pickle.load(g)
         print("Using the threshold of {:.2f}".format(threshold))
-        model = self.model
-        model.eval()
     
         cm = confusion_matrix(y_test, y_pred)
 

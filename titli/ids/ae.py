@@ -13,7 +13,7 @@ class Autoencoder(PyTorchModel):
     input_size = 100
     device = "cpu"
     def __init__(self, input_size, device):
-        super(Autoencoder, self).__init__("Autoencoder", input_size, device)
+        super().__init__("Autoencoder", input_size, device)
 
     def get_model(self):
         return nn.Sequential(
