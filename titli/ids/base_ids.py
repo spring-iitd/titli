@@ -193,8 +193,8 @@ class PyTorchModel(nn.Module):
 
         self.threshold = np.mean(reconstruction_errors) + 2 * np.std(reconstruction_errors)
         print(f"Threshold: {self.threshold}")
-        threshold_file = "threshold.pkl"
-        pickle.dump(self.threshold, open("threshold.pkl", 'wb')); print(f"Threshold saved to {threshold_file}")
+        threshold_file = "threshold_"+str(self.model_name)+".pkl"
+        pickle.dump(self.threshold, open(threshold_file, 'wb')); print(f"Threshold saved to {threshold_file}")
     
 
     
@@ -202,7 +202,8 @@ class PyTorchModel(nn.Module):
         """
         Infers on the test set and returns the true labels and predicted labels.
         """
-        with open("threshold.pkl", 'rb') as f:
+        threshold_file = "threshold"+str(self.model_name)+".pkl"
+        with open(threshold_file, 'rb') as f:
             threshold = pickle.load(f)
         print("Using the threshold of {:.2f}".format(threshold))
         self.eval()
@@ -223,16 +224,21 @@ class PyTorchModel(nn.Module):
                 # Apply threshold to each sample's reconstruction error and create binary prediction
                 y_pred.extend((sample_reconstruction_errors > self.threshold).astype(int))
         
-        threshold_file = "reconstruction_error.pkl"
-        pickle.dump(reconstruction_errors, open(threshold_file, 'wb')); print(f"Threshold saved to {threshold_file}")
+        reconstruction_errors = "reconstruction_error_"+str(self.model_name)+".pkl"
+        pickle.dump(reconstruction_errors, open(reconstruction_errors, 'wb')); print(f"Reconstruction errors  saved to {reconstruction_errors}")
         return y_test , y_pred
-    def evaluate(self,y_test, y_pred, device="cpu", cm_save_path="confusion_matrix.png", roc_save_path="roc_curve.png"):
+    def evaluate(self,y_test, y_pred):
         """
         Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
         """
-        with open("threshold.pkl", 'rb') as f:
+        cm_save_path="confusion_matrix_"+str(self.model_name)+".png"
+        roc_save_path="roc_curve_"+str(self.model_name)+".png"
+        threshold_file = "threshold_"+str(self.model_name)+".pkl"
+        with open(threshold_file, 'rb') as f:
             threshold = pickle.load(f)
-        with open("reconstruction_error.pkl", 'rb') as g:
+        reconstruction_errors = "reconstruction_error_"+str(self.model_name)+".pkl"
+
+        with open(reconstruction_errors, 'rb') as g:
             reconstruction_errors = pickle.load(g)
         print("Using the threshold of {:.2f}".format(threshold))
     

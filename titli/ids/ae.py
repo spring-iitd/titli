@@ -74,5 +74,5 @@ if __name__ == "__main__":
     model.save(model_path)
     model.load(Autoencoder, model_path)
     y_test,y_pred = model.infer(dataloader)
-    model.evaluate(y_test,y_pred, dataloader)
+    model.evaluate(y_test,y_pred)
 
