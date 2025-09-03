@@ -251,8 +251,8 @@ class dA:
                 self.params.n_visible * self.params.hiddenRatio))
 
         # for 0-1 normlaization
-        self.norm_max = np.ones((self.params.n_visible,)) * -np.Inf
-        self.norm_min = np.ones((self.params.n_visible,)) * np.Inf
+        self.norm_max = np.ones((self.params.n_visible,)) * -np.inf
+        self.norm_min = np.ones((self.params.n_visible,)) * np.inf
         self.n = 0
 
         self.rng = np.random.RandomState(1234)
