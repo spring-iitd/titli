@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "titli"
+version = "0.0.7"
+description = "A library for collection of IDS and tools for evaluating them"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Subrat Kumar Swain", email = "mailofswainsubrat@gmail.com" }]
+license = { text = "MIT" }
+keywords = ["ids", "adversarial", "network", "nids"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Security"
+]
+
+# Tip: don't list torch/torchvision here; install them via conda first (see below)
+dependencies = [
+  "scapy",
+  "numpy",
+  "pandas",
+  "matplotlib",
+  "scikit-learn",
+  "scipy",
+  "tqdm"
+]
+
+[project.urls]
+Homepage = "https://github.com/spg-iitd/titli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["titli*"]

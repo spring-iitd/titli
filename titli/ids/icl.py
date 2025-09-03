@@ -1,4 +1,4 @@
-from base_ids import PyTorchModel
+from .base_ids import PyTorchModel
 
 
 import torch
@@ -25,18 +25,18 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import ScalarFormatter
 
 class ICL(PyTorchModel):
-    def __init__(self, n_features = 100, kernel_size = 10, hidden_dims='16,4', rep_dim=32, tau=0.01, max_negatives=1000):
-        super(ICL, self).__init__("ICL",100,"cpu")
-        self.n_features = n_features
-        self.kernel_size = kernel_size
-        self.rep_dim = rep_dim
-        self.tau = tau
-        self.max_negatives = max_negatives
+    def __init__(self, dataset_name, input_size, device, titles):
+        self.title = titles
+        self.n_features = 100
+        self.kernel_size = 10
+        self.rep_dim = 32
+        self.tau = 0.01
+        self.max_negatives = 1000
+        # self.hidden_dims='16,4'
 
-        hidden_dims = [int(a) for a in hidden_dims.split(',')]
-        self.enc_f_net = nn.Linear(n_features - kernel_size + 1, rep_dim)
-        self.enc_g_net = nn.Linear(kernel_size, rep_dim)
-        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        super().__init__(dataset_name, input_size, device)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        self.to(self.device)
 
     def forward(self, x):
         positives, query = self.positive_matrix_builder(x)
@@ -49,7 +49,11 @@ class ICL(PyTorchModel):
         return loss
     
     def get_model(self):
-        a = 10
+        hidden_dims = '16,4'
+        hidden_dims = [int(a) for a in hidden_dims.split(',')]
+        self.enc_f_net = nn.Linear(self.n_features - self.kernel_size + 1, self.rep_dim)
+        self.enc_g_net = nn.Linear(self.kernel_size, self.rep_dim)
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
     
     def cal_logit(self, query, pos):
         batch_size, n_pos, _ = pos.shape  
@@ -74,56 +78,62 @@ class ICL(PyTorchModel):
         scores = []
         with torch.no_grad():
             for x, _ in val_loader:
+                x = self.scaler.transform(x.cpu().numpy())  # Scale the data
+                x = torch.tensor(x, dtype=torch.float32).to(self.device)
                 scores.extend(self.forward(x).cpu().numpy().tolist())
-        threshold = np.percentile(scores, 95)
-        threshold_path="threshold_"+str(self.model_name)+".pkl"
-        with open(threshold_path, "wb") as f:
-            pickle.dump(threshold, f)
-        print(f"the threshold is :{threshold}")
-        return threshold
+        self.threshold = np.percentile(scores, 95)
+    
+        print(f"the threshold is :{self.threshold}")
+        return self.threshold
 
-    def train_model(self, train_loader, model_path="icl_model.pth", threshold_path="threshold.pkl", device="cpu", epochs=1, lr=1e-3):
-        self.train()
-        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        for epoch in range(epochs):
+    def train_model(self, train_loader):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        all_train_data = []  # Collect all training data in a list
+        for inputs, _ in train_loader:
+            all_train_data.append(inputs.numpy())  # Convert tensor to numpy
+        all_train_data = np.concatenate(all_train_data, axis=0)
+        self.scaler.fit(all_train_data)
+        for epoch in range(self.epochs):
             total_loss = 0
+            batch_count = 0
             for x, _ in train_loader:
-                x = x.to(device)
+                x = x.to(self.device)
+                x = self.scaler.transform(x.cpu().numpy())  # Scale the data
+                x = torch.tensor(x, dtype=torch.float32).to(self.device)
                 optimizer.zero_grad()
                 loss = self.forward(x).mean()
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
                 total_loss += loss.item()
-            print(f"Epoch {epoch+1}, Loss: {total_loss / len(train_loader):.4f}")
+                batch_count += 1
+            # Calculate average loss using batch count instead of len(train_loader)
+            avg_loss = total_loss / batch_count if batch_count > 0 else 0.0
+            print(f"Epoch {epoch+1}, Loss: {avg_loss:.4f}")
         threshold = self.calculate_threshold(train_loader)
         print(f"Threshold calculated and saved: {threshold}")
 
-    def infer(self, loader, device):
-        # self.eval()
-        y_true, y_pred, errors = [], [], []
-        threshold_path="threshold_"+str(self.model_name)+".pkl"
-        with open(threshold_path, "rb") as f:
-            threshold = pickle.load(f)
+    def infer(self, loader):
+        if not self.threshold:
+            print("Threshold not set. Please load or train before inferring.")
+            return None
+
+        print("Using the threshold of {:.2f}".format(self.threshold))
+        self.eval()
+        reconstruction_errors = []
+        y_true = []
+        y_pred = []
         with torch.no_grad():
             for x, y in loader:
-                x = x.to(device)
+                x = x.to(self.device)
+                x = self.scaler.transform(x.cpu().numpy())
+                x = torch.tensor(x, dtype=torch.float32).to(self.device)
                 loss = self.forward(x)
                 y_true.extend(y.cpu().numpy().tolist())
-                y_pred.extend((loss.cpu().numpy() > threshold).astype(int).tolist())
-                errors.extend(loss.cpu().numpy().tolist())
-        reconstruction_errors = "reconstruction_error_"+str(self.model_name)+".pkl"
+                y_pred.extend((loss.cpu().numpy() > self.threshold).astype(int).tolist())
+                reconstruction_errors.extend(loss.cpu().numpy().tolist())
+        
+        return y_true, y_pred, reconstruction_errors
 
-        with open(reconstruction_errors, "wb") as f:
-            pickle.dump(errors, f)
-        return y_true, y_pred
-    
-    def save_model(self, path):
-        torch.save(self.state_dict(), path)
-        print("the model is saved sucessfully")
-
-    def load_model(self, path):
-        self.load_state_dict(torch.load(path))
-        print("the model is loaded successfully")
 
 def main():
     parser = argparse.ArgumentParser(description="Train and evaluate ICL model")
@@ -133,18 +143,21 @@ def main():
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size for DataLoader")
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     data = pd.read_csv(args.data_path)
     X, y = data.iloc[:, :-1].values.astype(np.float32), data.iloc[:, -1].values.astype(np.float32)
     tensor_data = TensorDataset(torch.tensor(X), torch.tensor(y))
     train_loader = DataLoader(tensor_data, batch_size=args.batch_size, shuffle=True)
 
     model = ICL()
-    model.train_model(train_loader, train_loader,args.model_path)
+    model.train_model(train_loader, train_loader, args.model_path)
     model.save_model(args.model_path)
     model.load_model(args.model_path)
-    y_true, y_pred = model.infer(train_loader, device="cpu")
+    y_true, y_pred = model.infer(train_loader, device=device)
     print(len(y_true), len(y_pred))
     model.evaluate(y_true, y_pred)
+
 
 if __name__ == "__main__":
     main()
