@@ -6,7 +6,7 @@ setup(
     description='A library for collection of IDS and tools for evaluating them',
     long_description=open("README.md").read(),
     long_description_content_type = "text/markdown",
-    url='https://github.com/spg-iitd/raids',
+    url='https://github.com/spg-iitd/titli',
     packages=find_packages(),
     license='MIT',
     author="Subrat Kumar Swain",

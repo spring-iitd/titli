@@ -1,3 +1,4 @@
 from .loss import RMSELoss
+from .datasets import StreamingCSVDataset
 
-all = ["RMSELoss"]
+all = ["RMSELoss", "StreamingCSVDataset"]
