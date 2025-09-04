@@ -44,7 +44,7 @@ class BaseSKLearnModel:
         X_train = self.scaler.fit_transform(X_train) # TODO: Check this later
         self.model.fit(X_train)
         self.calculate_threshold(X_train)
-    
+
     def calculate_threshold(self, X_train):
         """
         This function calculates the threshold based on the LOF scores from the training data.
@@ -70,7 +70,7 @@ class BaseSKLearnModel:
             # y_test.append(np.ones(labels.shape[0]))
         X_test = np.vstack(X_test)
         y_test = np.hstack(y_test)
-        X_test = self.scaler.transform(X_test) # TODO: Check this later
+        X_test = self.scaler.transform(X_test) # TODO: Check this later but ignore in pull request
        
         if self.model_name == "LOF":
             reconstruction_errors = -self.model.score_samples(X_test)

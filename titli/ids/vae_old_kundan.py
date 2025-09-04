@@ -31,7 +31,7 @@ class VAE(PyTorchModel):
     def get_model(self):
         # Encoder
         self.encoder = nn.Sequential(
-            nn.Linear(input_size, 128),
+            nn.Linear(self.input_size, 128),
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU()
@@ -45,7 +45,7 @@ class VAE(PyTorchModel):
             nn.ReLU(),
             nn.Linear(64, 128),
             nn.ReLU(),
-            nn.Linear(128, input_size),
+            nn.Linear(128, self.input_size),
             nn.Sigmoid()
         )
 
