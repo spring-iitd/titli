@@ -94,8 +94,8 @@ class StreamingCSVDataset(IterableDataset):
             if len(lab_row) > self.label_column:
                 y = torch.tensor(float(lab_row[self.label_column]), dtype=torch.float32)
             else:
-                # If label row is shorter than expected, default to 0
-                y = torch.tensor(0.0, dtype=torch.float32)
+                # If label row is shorter than expected, raise an error
+                raise ValueError(f"Label row is missing expected column {self.label_column}. Label row: {lab_row}")
                 
         except ValueError as e:
             print(f"Error processing row: {e}")
