@@ -137,7 +137,7 @@ class ICL(PyTorchModel):
 
 def main():
     parser = argparse.ArgumentParser(description="Train and evaluate ICL model")
-    parser.add_argument("--data-path", type=str, default="/home/kundan/titli/utils/weekday_20k.csv", help="Path to the dataset")
+    parser.add_argument("--data-path", type=str, default="utils/weekday_20k.csv", help="Path to the dataset")
     parser.add_argument("--model-path", type=str, default="icl_model.pth", help="Path to save the trained model")
     parser.add_argument("--threshold-path", type=str, default="threshold.pkl", help="Path to save the calculated threshold")
     parser.add_argument("--batch-size", type=int, default=64, help="Batch size for DataLoader")
