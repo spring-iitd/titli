@@ -161,8 +161,7 @@ class LegacyStreamingCSVDataset(Dataset):
             if len(label_row) > self.label_column:
                 label = torch.tensor(float(label_row[self.label_column]), dtype=torch.float32)
             else:
-                # If label row is shorter than expected, default to 0
-                label = torch.tensor(0.0, dtype=torch.float32)
+                raise ValueError(f"Missing label data at index {idx}: expected column {self.label_column}, got row {label_row}")
         except ValueError as e:
             print(f"Error processing row {idx}: {e}")
             print(f"Feature row: {feature_row}")
