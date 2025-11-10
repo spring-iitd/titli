@@ -3,11 +3,17 @@ Changelog
 
 This page documents the version history and changes made to Titli.
 
-Version 0.0.9 (Current)
------------------------
+Version 0.0.10 (Current)
+------------------------
 
 **Added:**
 
+* (Placeholder for changes in 0.0.10. Please update with actual changes.)
+
+Version 0.0.9
+-------------
+
+**Added:**
 * Comprehensive Sphinx documentation
 * API reference for all modules
 * Usage guides and examples
