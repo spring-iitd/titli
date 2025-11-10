@@ -8,6 +8,26 @@ A toolkit for hosting feature extraction, model training, model inference, and m
 ![PyPI - Version](https://img.shields.io/pypi/v/titli)
 ![GitHub License](https://img.shields.io/github/license/spg-iitd/titli)
 
+## Documentation
+
+📚 **[Read the full documentation](docs/)** to get started with Titli.
+
+The documentation includes:
+- Installation guide
+- Quick start tutorial
+- Detailed usage examples
+- Complete API reference
+- And more!
+
+To build the documentation locally:
+```bash
+cd docs
+pip install sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+make html
+```
+
+Then open `docs/build/html/index.html` in your web browser.
+
 ### Installation
 ```
 pip install titli
