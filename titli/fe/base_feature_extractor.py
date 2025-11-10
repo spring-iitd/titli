@@ -7,33 +7,33 @@ import pickle
 import json
 from io import TextIOWrapper
 
-class LazyInitializationMixin:
-    def lazy_init(self, **kwargs):
+# class LazyInitializationMixin:
+#     def lazy_init(self, **kwargs):
         
-        for k, v in kwargs.items():
-            if k in self.allowed:
-                setattr(self, k, v)
-            else:
-                raise ValueError(f"{k} not allowed")
-            setattr(self, k, v)
-            self.allowed.remove(k)
+#         for k, v in kwargs.items():
+#             if k in self.allowed:
+#                 setattr(self, k, v)
+#             else:
+#                 raise ValueError(f"{k} not allowed")
+#             setattr(self, k, v)
+#             self.allowed.remove(k)
 
-    def start(self, **kwargs):
-        assigned=list(self.allowed)
-        for k, v in kwargs.items():
-            if k in self.allowed:
-                setattr(self, k, v)
-            else:
-                raise ValueError(f"{k} not allowed")
-            assigned.remove(k)
+#     def start(self, **kwargs):
+#         assigned=list(self.allowed)
+#         for k, v in kwargs.items():
+#             if k in self.allowed:
+#                 setattr(self, k, v)
+#             else:
+#                 raise ValueError(f"{k} not allowed")
+#             assigned.remove(k)
 
-        if len(assigned)>0:
-            raise ValueError("Must assign the following variables",",".join(assigned))
+#         if len(assigned)>0:
+#             raise ValueError("Must assign the following variables",",".join(assigned))
 
-        return self.entry()
+#         return self.entry()
 
-    def __rrshift__(self, other):
-        return self.start(**other)
+#     def __rrshift__(self, other):
+#         return self.start(**other)
 
 class JSONEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -54,14 +54,19 @@ def save_dataset_info(data_info):
     with open("./datasets/data_info.json", "w") as f:
         json.dump(data_info, f, indent=4, cls=JSONEncoder)
 
-class BaseTrafficFeatureExtractor(ABC, LazyInitializationMixin):
-    def __init__(self, **kwargs):
-        """base feature extractor. By default three variables must be
-        set: dataset_name, file_name, and state.
+class BaseTrafficFeatureExtractor(ABC):
+    def __init__(self, file_path, dataset_name=None, state=None, **kwargs):
+        """base feature extractor. file_path is required, dataset_name and state are optional.
+        
+        Args:
+            file_path (str): Path to the pcap file (required)
+            dataset_name (str, optional): Name of the dataset. Defaults to None.
+            state (NetStat, optional): Pre-existing state to continue from. Defaults to None.
         """
-        self.allowed = ["dataset_name", "file_name", "state"]
-        self.lazy_init(**kwargs)
-        self.entry = self.extract_features
+        self.file_path = file_path
+        # self.dataset_name = dataset_name
+        self.state = state
+        # self.entry = self.extract_features
 
     @abstractmethod
     def update(self, traffic_vector):
@@ -76,7 +81,7 @@ class BaseTrafficFeatureExtractor(ABC, LazyInitializationMixin):
     @abstractmethod
     def peek(self, traffic_vectors):
         """applies fake update to the feature extractor, does not actually
-        update the state of feature extractor. Not required but used for LM attack.
+        update the state of feature extractor. Not required but used for adversarial attack.
         returns a list of features corresonding to the traffic vectors
 
         Args:
@@ -101,18 +106,26 @@ class BaseTrafficFeatureExtractor(ABC, LazyInitializationMixin):
         It also initializes count (number of packets processed), skipped (number of
         packets skipped), and written (number of features extracted)
         """
-        self.path = Path(
-            f"../../datasets/{self.dataset_name}/pcap/{self.file_name}.pcap"
-        )
+        # self.path = Path(
+        #     f"../../datasets/{self.dataset_name}/pcap/{self.file_name}.pcap"
+        # )
 
-        feature_file = Path(
-            f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}.csv"
-        )
-        feature_file.parent.mkdir(parents=True, exist_ok=True)
-        meta_file = Path(
-            f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}_meta.csv"
-        )
-        meta_file.parent.mkdir(parents=True, exist_ok=True)
+        # feature_file = Path(
+        #     f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}.csv"
+        # )
+        # feature_file.parent.mkdir(parents=True, exist_ok=True)
+        # meta_file = Path(
+        #     f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}_meta.csv"
+        # )
+        # meta_file.parent.mkdir(parents=True, exist_ok=True)
+
+        self.path = Path(self.file_path)
+        feature_file = self.path.with_suffix(".csv")
+        meta_file = self.path.parent / (self.path.stem + "_meta.csv")
+
+        # Ensure parent directories exist
+        # feature_file.parent.mkdir(parents=True, exist_ok=True)
+        # meta_file.parent.mkdir(parents=True, exist_ok=True)
 
         self.feature_file = open(feature_file, "w")
         self.meta_file = open(meta_file, "w")
@@ -152,31 +165,32 @@ class BaseTrafficFeatureExtractor(ABC, LazyInitializationMixin):
         self.meta_file.close()
         self.feature_file.close()
         self.input_pcap.close()
-        # save file information
-        data_info = load_dataset_info()
+        # # save file information
+        # data_info = load_dataset_info()
 
-        if self.dataset_name not in data_info.keys():
-            data_info[self.dataset_name] = {}
+        # if self.dataset_name not in data_info.keys():
+        #     data_info[self.dataset_name] = {}
 
-        if self.name not in data_info[self.dataset_name].keys():
-            data_info[self.dataset_name][self.name] = {}
+        # if self.name not in data_info[self.dataset_name].keys():
+        #     data_info[self.dataset_name][self.name] = {}
 
-        data_info[self.dataset_name][self.name][self.file_name] = {
-            "pcap_path": self.path,
-            "feature_path": self.feature_file,
-            "meta_path": self.meta_file,
-            "num_rows": self.count,
-        }
+        # data_info[self.dataset_name][self.name][self.file_name] = {
+        #     "pcap_path": self.path,
+        #     "feature_path": self.feature_file,
+        #     "meta_path": self.meta_file,
+        #     "num_rows": self.count,
+        # }
 
-        save_dataset_info(data_info)
+        # save_dataset_info(data_info)
         print(
             f"skipped: {self.skipped} processed: {self.count+self.skipped} written: {self.count}"
         )
 
         if self.save_state:
-            state_path = Path(
-                f"../../datasets/{self.dataset_name}/{self.name}/state.pkl"
-            )
+            # state_path = Path(
+            #     f"../../datasets/{self.dataset_name}/{self.name}/state.pkl"
+            # )
+            state_path = self.path.parent / "state.pkl"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             with open(state_path, "wb") as pf:
                 pickle.dump(self.state, pf)

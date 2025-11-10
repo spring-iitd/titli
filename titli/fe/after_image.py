@@ -13,18 +13,23 @@ from tqdm import tqdm
 
 
 class AfterImage(BaseTrafficFeatureExtractor):
-    def __init__(self, limit=float("inf"), decay_factors=[5, 3, 1, 0.1, 0.01], max_pkt=float("inf"), **kwargs):
+    def __init__(self, file_path, limit=float("inf"), decay_factors=[5, 3, 1, 0.1, 0.01], 
+                 max_pkt=float("inf"), dataset_name=None, state=None, **kwargs):
         """initializes afterimage, a packet-based feature extractor used in Kitsune
 
         Args:
-            limit (int, optional): maximum number of records. Defaults to 1e6.
+            file_path (str): Path to the pcap file (required)
+            limit (int, optional): maximum number of records. Defaults to inf.
             decay_factors (list, optional): the time windows. Defaults to [5,3,1,.1,.01].
+            max_pkt (int, optional): maximum number of packets to process. Defaults to inf.
+            dataset_name (str, optional): Name of the dataset. Defaults to None.
+            state (NetStat, optional): Pre-existing state. Defaults to None.
         """
-        super().__init__(**kwargs)
+        super().__init__(file_path=file_path, dataset_name=dataset_name, state=state, **kwargs)
         self.limit = limit
         self.decay_factors = decay_factors
         self.name = "AfterImage"
-        self.max_pkt =max_pkt
+        self.max_pkt = max_pkt
 
     def setup(self):
         """sets up after image"""
@@ -62,7 +67,7 @@ class AfterImage(BaseTrafficFeatureExtractor):
 
         features_list = []
         meta_list = []
-        for packet in tqdm(self.input_pcap, desc=f"parsing {self.file_name}"):
+        for packet in tqdm(self.input_pcap, desc=f"parsing {self.path.name}"):
             if self.count>self.max_pkt:
                 break
             
@@ -77,8 +82,6 @@ class AfterImage(BaseTrafficFeatureExtractor):
             else:
                 self.offset_time = 0
             traffic_vector[-2] -= self.offset_time
-
-
 
             feature = self.update(traffic_vector)
             features_list.append(feature)

@@ -1,6 +1,6 @@
 from .after_image import AfterImage, NetStat
 
-all = [
-    NetStat,
-    AfterImage
+__all__ = [
+    "NetStat",
+    "AfterImage"
 ]
