@@ -1,5 +1,8 @@
 # Titli
-Artificial Intelligence based Intrusion Detection Systems
+A toolkit for hosting feature extraction, model training, model inference, and model evaluation of AI-based Intrusion Detection Systems
+<p align="center">
+	<img src="assets/images/pipeline-overview.jpg" alt="Pipeline Overview" width="800" />
+</p>
 
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/titli)
 ![PyPI - Version](https://img.shields.io/pypi/v/titli)
