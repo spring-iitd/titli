@@ -7,6 +7,7 @@ A toolkit for hosting feature extraction, model training, model inference, and m
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/titli)
 ![PyPI - Version](https://img.shields.io/pypi/v/titli)
 ![GitHub License](https://img.shields.io/github/license/spg-iitd/titli)
+[![Documentation Status](https://readthedocs.org/projects/titli/badge/?version=latest)](https://titli.readthedocs.io/en/latest/?badge=latest)
 
 ## Documentation
 
