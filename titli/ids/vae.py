@@ -54,9 +54,8 @@ class SimpleScaler:
         return {'is_fitted': False}
 
 class VAE(PyTorchModel):
-    def __init__(self, dataset_name, input_size, device, titles):
+    def __init__(self, dataset_name, input_size, device):
         super().__init__(dataset_name, input_size, device)
-        self.title = titles
         self.criterion = nn.MSELoss()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         self.simple_scaler = SimpleScaler()  # Simple scaler: collect, fit once, use always
@@ -229,7 +228,7 @@ class VAE(PyTorchModel):
     def save(self, model_path=None):
         """Save model with scaler parameters"""
         if model_path is None:
-            model_path = f"./artifacts/{self.dataset_name}/models/{self.model_name.lower()}_{self.title}.pth"
+            model_path = f"./artifacts/{self.dataset_name}/models/{self.model_name.lower()}.pth"
         
         torch.save({
             'model_state_dict': self.state_dict(),
@@ -242,7 +241,7 @@ class VAE(PyTorchModel):
     def load(self, model_path=None):
         """Load model with scaler parameters"""
         if model_path is None:
-            model_path = f"./artifacts/{self.dataset_name}/models/{self.model_name.lower()}_{self.title}.pth"
+            model_path = f"./artifacts/{self.dataset_name}/models/{self.model_name.lower()}.pth"
         
         checkpoint = torch.load(model_path, map_location=self.device)
         self.load_state_dict(checkpoint['model_state_dict'])
@@ -285,7 +284,7 @@ if __name__ == "__main__":
     # Dataset 
     dataset_name = "uq-iot"
     
-    model = VAE(dataset_name=dataset_name, input_size=100, device="cpu", titles="online")
+    model = VAE(dataset_name=dataset_name, input_size=100, device="cpu")
     model.train_model(dataloader)
     model.save()
     model.load()

@@ -471,11 +471,10 @@ class KitNET(PyTorchModel):
     2. Inference phase: Uses the PyTorch implementation for faster inference
     """
     
-    def __init__(self, dataset_name, input_size, device, titles="default", 
+    def __init__(self, dataset_name, input_size, device,
                  max_autoencoder_size=10, FM_grace_ratio=0.2, AD_grace_ratio=0.8,
                  learning_rate=0.1, hidden_ratio=0.75):
         super().__init__(dataset_name, input_size, device)
-        self.title = titles
         self.max_autoencoder_size = max_autoencoder_size
         self.FM_grace_ratio = FM_grace_ratio  # 0.2 = 20% of packets for feature mapping
         self.AD_grace_ratio = AD_grace_ratio  # 0.8 = 80% of packets for anomaly detection training

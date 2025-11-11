@@ -25,8 +25,7 @@ import matplotlib.ticker as ticker
 from matplotlib.ticker import ScalarFormatter
 
 class ICL(PyTorchModel):
-    def __init__(self, dataset_name, input_size, device, titles):
-        self.title = titles
+    def __init__(self, dataset_name, input_size, device):
         self.n_features = 100
         self.kernel_size = 10
         self.rep_dim = 32

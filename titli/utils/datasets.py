@@ -19,11 +19,14 @@ class StreamingCSVDataset(IterableDataset):
             self.feature_headers = next(reader)
             self.input_size = len(self.feature_headers)
         
-        # Check label file structure
+        # Check label file structuree
         with open(label_csv_path, 'r', newline='') as f:
             reader = csv.reader(f)
+            self.label_headers = next(reader)
+            # Check if the specified label column exists
+            if self.label_column >= len(self.label_headers):
                 raise ValueError(f"Label column index {self.label_column} is out of range. Valid indices are 0-{len(self.label_headers)-1}.")
-    
+ 
     def _open_pair(self):
         """Open both CSV files and return file handles and readers"""
         # Open in text mode; newline='' for csv correctness

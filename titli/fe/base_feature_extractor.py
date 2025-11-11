@@ -99,7 +99,7 @@ class BaseTrafficFeatureExtractor(ABC):
         """
         pass
 
-    def setup(self):
+    def setup(self, output_path):
         """set up the feature extractor. By default it opens the input pcap
         file, the output feature csv file, output meta data (AKA traffic vector) csv file,
         and sets the state of the extractor.
@@ -120,8 +120,12 @@ class BaseTrafficFeatureExtractor(ABC):
         # meta_file.parent.mkdir(parents=True, exist_ok=True)
 
         self.path = Path(self.file_path)
-        feature_file = self.path.with_suffix(".csv")
-        meta_file = self.path.parent / (self.path.stem + "_meta.csv")
+        if output_path is not None:
+            feature_file = Path(output_path)
+            meta_file = feature_file.parent / (feature_file.stem + "_meta.csv")
+        else:
+            feature_file = self.path.with_suffix(".csv")
+            meta_file = self.path.parent / (self.path.stem + "_meta.csv")
 
         # Ensure parent directories exist
         # feature_file.parent.mkdir(parents=True, exist_ok=True)

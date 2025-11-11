@@ -35,6 +35,13 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/spg-iitd/titli"
 
+[project.optional-dependencies]
+docs = [
+  "sphinx>=8.0.0",
+  "sphinx-rtd-theme>=3.0.0",
+  "sphinx-autodoc-typehints>=3.0.0"
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["titli*"]
