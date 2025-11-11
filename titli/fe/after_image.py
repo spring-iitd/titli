@@ -1,29 +1,54 @@
-import numpy as np
-from pprint import pformat
+"""AfterImage feature extractor for network intrusion detection.
+
+This module implements the AfterImage feature extraction method used in the Kitsune
+network intrusion detection system. It maintains incremental statistics across
+multiple time windows to capture network traffic patterns.
+"""
+
 import copy
-from scapy.all import *
-from scapy.layers.http import *
-from scapy.layers.inet import *
-from .base_feature_extractor import *
-from pathlib import Path
-import pickle
+import itertools
 import json
-# from utils import *
+import pickle
+from pathlib import Path
+from pprint import pformat
+
+import numpy as np
+from scapy.all import ARP, ICMP, IP, IPv6, TCP, UDP
 from tqdm import tqdm
+
+from .base_feature_extractor import BaseTrafficFeatureExtractor
 
 
 class AfterImage(BaseTrafficFeatureExtractor):
+    """AfterImage feature extractor using incremental statistics over time windows.
+    
+    AfterImage is a packet-based feature extractor that maintains incremental statistics
+    across multiple exponentially-decaying time windows. It tracks network flows at
+    different granularities (MAC-IP pairs, channels, sockets, jitter) to capture
+    both normal and anomalous traffic patterns.
+    
+    Attributes:
+        limit (float): Maximum number of records to store in the database
+        decay_factors (list): Time windows for exponential decay (in seconds)
+        max_pkt (float): Maximum number of packets to process
+        state (NetStat): Internal state maintaining network statistics
+    """
+    
     def __init__(self, file_path, limit=float("inf"), decay_factors=[5, 3, 1, 0.1, 0.01], 
                  max_pkt=float("inf"), dataset_name=None, state=None, **kwargs):
-        """initializes afterimage, a packet-based feature extractor used in Kitsune
+        """Initialize AfterImage feature extractor.
 
         Args:
-            file_path (str): Path to the pcap file (required)
-            limit (int, optional): maximum number of records. Defaults to inf.
-            decay_factors (list, optional): the time windows. Defaults to [5,3,1,.1,.01].
-            max_pkt (int, optional): maximum number of packets to process. Defaults to inf.
-            dataset_name (str, optional): Name of the dataset. Defaults to None.
-            state (NetStat, optional): Pre-existing state. Defaults to None.
+            file_path (str): Path to the PCAP file to process
+            limit (float, optional): Maximum number of records in the statistics database.
+                Defaults to inf (unlimited)
+            decay_factors (list, optional): Time windows (in seconds) for exponential decay.
+                Defaults to [5, 3, 1, 0.1, 0.01]
+            max_pkt (float, optional): Maximum number of packets to process.
+                Defaults to inf (all packets)
+            dataset_name (str, optional): Name of the dataset (deprecated). Defaults to None
+            state (NetStat, optional): Pre-existing state to continue from. Defaults to None
+            **kwargs: Additional arguments passed to base class
         """
         super().__init__(file_path=file_path, dataset_name=dataset_name, state=state, **kwargs)
         self.limit = limit
@@ -31,8 +56,13 @@ class AfterImage(BaseTrafficFeatureExtractor):
         self.name = "AfterImage"
         self.max_pkt = max_pkt
 
-    def setup(self, output_path):
-        """sets up after image"""
+    def setup(self, output_path=None):
+        """Set up AfterImage with NetStat database if starting fresh.
+        
+        Args:
+            output_path (str or Path, optional): Custom output path for features.
+                Defaults to None (uses PCAP directory)
+        """
         super().setup(output_path)
         if self.reset_state:
             self.state = NetStat(
@@ -41,14 +71,17 @@ class AfterImage(BaseTrafficFeatureExtractor):
             )
 
     def peek(self, traffic_vectors):
-        """fake update. obtains a copy of existing database,
-        applies the traffic vectors to it.
+        """Simulate feature extraction without modifying internal state.
+        
+        Creates a temporary copy of the statistics database, applies traffic vectors
+        to it, and returns features without persisting changes.
 
         Args:
-            traffic_vectors (2d array): list of traffic vectors to be updated
+            traffic_vectors (list): List of traffic vectors, each containing
+                [IPtype, srcMAC, dstMAC, srcIP, srcproto, dstIP, dstproto, timestamp, size]
 
         Returns:
-            2d array: the corresponding features
+            list: List of feature arrays corresponding to each traffic vector
         """
         fake_db = self.state.get_records(traffic_vectors)
         vectors = []
@@ -57,18 +90,25 @@ class AfterImage(BaseTrafficFeatureExtractor):
         return vectors
 
     def extract_features(self, output_path=None):
-        """main loop to extract the features. If state is set,
-        change the time so that it is starts immediately after the benign
-        traffic.
-        for each packet, extract the traffic vectors and get features. Write to
-        file every 10000 records
+        """Extract features from PCAP file packet by packet.
+        
+        Main processing loop that:
+        1. Reads packets from PCAP file
+        2. Extracts traffic vectors from each packet
+        3. Computes features using incremental statistics
+        4. Writes results to CSV files in batches
+        5. Handles timestamp offsets when continuing from existing state
+        
+        Args:
+            output_path (str or Path, optional): Custom output path for features.
+                Defaults to None (uses PCAP directory)
         """
         self.setup(output_path=output_path)
 
         features_list = []
         meta_list = []
         for packet in tqdm(self.input_pcap, desc=f"parsing {self.path.name}"):
-            if self.count>self.max_pkt:
+            if self.count > self.max_pkt:
                 break
             
             traffic_vector = self.get_traffic_vector(packet)
@@ -87,7 +127,6 @@ class AfterImage(BaseTrafficFeatureExtractor):
             features_list.append(feature)
             meta_list.append(traffic_vector)
             self.count += 1
-            
 
             if self.count % 1e4 == 0:
                 np.savetxt(
@@ -102,7 +141,6 @@ class AfterImage(BaseTrafficFeatureExtractor):
                 features_list = []
                 meta_list = []
 
-        # save remaining
         np.savetxt(
             self.feature_file, np.vstack(features_list), delimiter=",", fmt="%.7f"
         )
@@ -111,25 +149,29 @@ class AfterImage(BaseTrafficFeatureExtractor):
         self.teardown()
 
     def update(self, traffic_vector):
-        """updates the internal state with traffic vector
+        """Update internal state and compute features for a traffic vector.
 
         Args:
-            traffic_vector (array): a traffic vectors consists of
-            data extracted from pacekts
+            traffic_vector (list): Traffic vector containing
+                [IPtype, srcMAC, dstMAC, srcIP, srcproto, dstIP, dstproto, timestamp, size]
 
         Returns:
-            array: the extracted features
+            np.ndarray: Extracted features from incremental statistics
         """
         return self.state.update_get_stats(*traffic_vector)
 
     def get_traffic_vector(self, packet):
-        """extracts the traffic vectors from packet
+        """Extract traffic vector from a network packet.
+        
+        Processes IP, IPv6, TCP, UDP, ARP, and ICMP packets to extract network flow
+        identifiers and metadata.
 
         Args:
-            packet (scapy packet): input packet
+            packet (scapy.packet.Packet): Input packet from PCAP
 
         Returns:
-            array: list of IPtype, srcMAC, dstMAC, srcIP, srcproto, dstIP, dstproto, time, packet size
+            list or None: Traffic vector as [IPtype, srcMAC, dstMAC, srcIP, srcproto,
+                dstIP, dstproto, timestamp, size], or None if packet should be skipped
         """
         packet = packet[0]
 
@@ -139,11 +181,12 @@ class AfterImage(BaseTrafficFeatureExtractor):
 
         timestamp = packet.time
         framelen = len(packet)
-        if packet.haslayer(IP):  # IPv4
+        
+        if packet.haslayer(IP):
             srcIP = packet[IP].src
             dstIP = packet[IP].dst
             IPtype = 0
-        elif packet.haslayer(IPv6):  # ipv6
+        elif packet.haslayer(IPv6):
             srcIP = packet[IPv6].src
             dstIP = packet[IPv6].dst
             IPtype = 1
@@ -168,20 +211,20 @@ class AfterImage(BaseTrafficFeatureExtractor):
             srcMAC = packet.src
             dstMAC = packet.dst
 
-        if srcproto == "":  # it's a L2/L1 level protocol
-            if packet.haslayer(ARP):  # is ARP
+        if srcproto == "":
+            if packet.haslayer(ARP):
                 srcproto = "arp"
                 dstproto = "arp"
-                srcIP = packet[ARP].psrc  # src IP (ARP)
-                dstIP = packet[ARP].pdst  # dst IP (ARP)
+                srcIP = packet[ARP].psrc
+                dstIP = packet[ARP].pdst
                 IPtype = 0
-            elif packet.haslayer(ICMP):  # is ICMP
+            elif packet.haslayer(ICMP):
                 srcproto = "icmp"
                 dstproto = "icmp"
                 IPtype = 0
-            elif srcIP + srcproto + dstIP + dstproto == "":  # some other protocol
-                srcIP = packet.src  # src MAC
-                dstIP = packet.dst  # dst MAC
+            elif srcIP + srcproto + dstIP + dstproto == "":
+                srcIP = packet.src
+                dstIP = packet.dst
 
         traffic_vector = [
             IPtype,
@@ -198,14 +241,12 @@ class AfterImage(BaseTrafficFeatureExtractor):
         return traffic_vector
 
     def get_headers(self):
-        """returns the feature names
+        """Get feature column names for CSV output.
 
         Returns:
-            list: list of feature names
+            list[str]: Feature names combining stream type, time window, and statistic
         """
-
         stat_1d = ["weight", "mean", "std"]
-
         stat_2d = ["magnitude", "radius", "covariance", "pcc"]
         stream_1d = ["Src-MAC-IP", "Jitter"]
         stream_2d = ["Channel", "Socket"]
@@ -216,20 +257,19 @@ class AfterImage(BaseTrafficFeatureExtractor):
         for name, stat in itertools.product(stream_2d, stat_1d + stat_2d):
             for time in self.decay_factors:
                 headers.append(f"{name}_{time}_{stat}")
-
         return headers
 
     def get_meta_headers(self):
-        """return the feature names of traffic vectors
+        """Get traffic vector column names for metadata CSV.
 
         Returns:
-            list: names of traffic vectors
+            list[str]: Metadata column names
         """
         return [
             "ip_type",
             "src_mac",
             "dst_mac",
-            "scr_ip",
+            "src_ip",
             "src_protocol",
             "dst_ip",
             "dst_protocol",
@@ -239,14 +279,14 @@ class AfterImage(BaseTrafficFeatureExtractor):
 
 
 def magnitude(x, y):
-    """the magnitude of a set of incStats, pass var instead of mean to get radius
+    """Calculate the Euclidean magnitude of two values.
 
     Args:
-        x (float): first value
-        y (float): second value
+        x (float or np.ndarray): First value
+        y (float or np.ndarray): Second value
 
     Returns:
-        float: result
+        float or np.ndarray: sqrt(x^2 + y^2)
     """
     return np.sqrt(np.power(x, 2) + np.power(y, 2))
 
