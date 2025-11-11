@@ -180,7 +180,7 @@ class BaseSKLearnModel:
         print(f"Accuracy: {accuracy}")
 
         # Save metrics
-        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}_{self.title}.txt"
+        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}.txt"
         os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
         with open(metrics_path, "w") as file:
             file.write(f"Accuracy:    {accuracy:.3f}\n")
@@ -225,7 +225,7 @@ class BaseSKLearnModel:
             plt.legend(loc='lower right')
 
             # Save the plot
-            roc_save_path = f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}_{self.title}.png"
+            roc_save_path = f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}.png"
             os.makedirs(os.path.dirname(roc_save_path), exist_ok=True)
             plt.savefig(roc_save_path)
             plt.close()
@@ -270,7 +270,7 @@ class BaseSKLearnModel:
         ax.set_xticklabels(["Benign", "Malicious"])
         ax.set_yticklabels(["Benign", "Malicious"])
         
-        cm_save_path=f"./artifacts/{self.dataset_name}/plots/confusion_matrix/{self.model_name.lower()}"+"_"+str(self.title)+".png"
+        cm_save_path=f"./artifacts/{self.dataset_name}/plots/confusion_matrix/{self.model_name.lower()}.png"
         print(f"confusion matrix saved to {cm_save_path}")
 
         plt.savefig(cm_save_path)
@@ -290,9 +290,6 @@ class BaseSKLearnModel:
             self.scaler, self.model, self.threshold = pickle.load(f)
     
     def plot_anomaly(self, anomaly_score):
-        # Extract and format the title
-        title = self.title
-
         # Generate indices for the x-axis
         packet_indices = np.arange(len(anomaly_score))
 
@@ -318,7 +315,7 @@ class BaseSKLearnModel:
         plt.axhline(y=self.threshold, color="blue", linestyle="--", label="Threshold")
 
         # Set the title and labels with appropriate font sizes and bold font
-        plt.title(title, fontsize=20, fontweight='bold')
+        plt.title(f"{self.model_name} Anomaly Detection", fontsize=20, fontweight='bold')
         plt.xlabel("Packet Index", fontsize=15, fontweight='bold')
         plt.ylabel("Anomaly Score", fontsize=15, fontweight='bold')
 
@@ -341,7 +338,7 @@ class BaseSKLearnModel:
         # Define the folder path
         # s=str(args.pcap_path).split("data/")[1].split("/")[0]
 
-        plot_path =  f"./artifacts/{self.dataset_name}/plots/anomaly/{self.model_name.lower()}"+"_"+str(self.title)+".png"
+        plot_path =  f"./artifacts/{self.dataset_name}/plots/anomaly/{self.model_name.lower()}.png"
 
         # folder_path = os.path.dirname(plot_path)
 
@@ -556,9 +553,9 @@ class PyTorchModel(nn.Module):
         """
         Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
         """
-        cm_save_path = f"./artifacts/{self.dataset_name}/plots/confusion_matrix/{self.model_name.lower()}_{self.title}.png"
-        roc_save_path = f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}_{self.title}.png"
-        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}_{self.title}.txt"
+        cm_save_path = f"./artifacts/{self.dataset_name}/plots/confusion_matrix/{self.model_name.lower()}.png"
+        roc_save_path = f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}.png"
+        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}.txt"
 
         threshold = self.threshold
         print(f"Using the threshold of {threshold:.2f}")
@@ -660,9 +657,6 @@ class PyTorchModel(nn.Module):
       
         plt.figure(figsize=(12, 8))
 
-        # Extract and format the title
-        title = self.title
-
         # Generate indices for the x-axis
         packet_indices = np.arange(len(anomaly_score))
         
@@ -682,7 +676,7 @@ class PyTorchModel(nn.Module):
         plt.axhline(y=self.threshold, color="blue", linestyle="--", label="Threshold")
 
         # Set the title and labels with appropriate font sizes and bold font
-        plt.title(title, fontsize=20, fontweight='bold')
+        plt.title(f"{self.model_name} Anomaly Detection", fontsize=20, fontweight='bold')
         plt.xlabel("Packet Index", fontsize=15, fontweight='bold')
         plt.ylabel("Anomaly Score", fontsize=15, fontweight='bold')
 
@@ -705,7 +699,7 @@ class PyTorchModel(nn.Module):
         # Define the folder path
         # s=str(args.pcap_path).split("data/")[1].split("/")[0]
 
-        plot_path =  f"./artifacts/{self.dataset_name}/plots/anomaly/{self.model_name.lower()}"+"_"+str(self.title)+".png"
+        plot_path =  f"./artifacts/{self.dataset_name}/plots/anomaly/{self.model_name.lower()}.png"
 
         # folder_path = os.path.dirname(plot_path)
 

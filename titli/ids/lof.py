@@ -20,8 +20,7 @@ class LOF(BaseSKLearnModel):
     Local Outlier Factor (LOF) model for anomaly detection in NIDS. Adapted from the 
     paper: http://dx.doi.org/10.1137/1.9781611972733.3
     """
-    def __init__(self,dataset_name=None, input_size=None, device=None,titles = None):
-        self.title = titles
+    def __init__(self,dataset_name=None, input_size=None, device=None):
         self.scaler = StandardScaler()
         self.model = LocalOutlierFactor(n_neighbors=20, contamination="auto", novelty=True)
         self.model_name = self.__class__.__name__
@@ -95,7 +94,7 @@ class LOF(BaseSKLearnModel):
         print(f"Accuracy: {accuracy}")
 
         # Save metrics to file
-        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}_{self.title}.txt"
+        metrics_path = f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}.txt"
         os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
         with open(metrics_path, "w") as file:
             file.write(f"Accuracy:       {accuracy:.3f}\n")

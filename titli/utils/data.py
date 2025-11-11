@@ -16,8 +16,6 @@ def dataloader(pcap_path, fe):
 
         yield features
 
-
-
 def create_directories(dataset_name):
     # Define the base path for artifacts
     base_path = os.path.join("./artifacts", dataset_name)
@@ -45,4 +43,3 @@ def create_directories(dataset_name):
         os.makedirs(object_path, exist_ok=True)
 
     print(f"Folder structure created for dataset: {dataset_name}")
-

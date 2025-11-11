@@ -13,8 +13,7 @@ import matplotlib.pyplot as plt
 
 
 class OCSVM(BaseSKLearnModel):
-    def __init__(self, dataset_name=None, input_size=None, device=None, titles=None):
-        self.title = titles
+    def __init__(self, dataset_name=None, input_size=None, device=None):
         self.scaler = StandardScaler()
         self.model = OneClassSVM(nu=0.01)
         self.model_name = self.__class__.__name__

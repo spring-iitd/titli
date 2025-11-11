@@ -45,8 +45,7 @@ from sklearn.preprocessing import StandardScaler
 
 
 class Autoencoder(PyTorchModel):
-    def __init__(self, dataset_name, input_size, device, titles):
-        self.title = titles
+    def __init__(self, dataset_name, input_size, device):
         super().__init__(dataset_name, input_size, device)
 
         # Now we use encoder and decoder instead of self.model directly

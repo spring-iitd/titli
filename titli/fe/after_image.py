@@ -31,9 +31,9 @@ class AfterImage(BaseTrafficFeatureExtractor):
         self.name = "AfterImage"
         self.max_pkt = max_pkt
 
-    def setup(self):
+    def setup(self, output_path):
         """sets up after image"""
-        super().setup()
+        super().setup(output_path)
         if self.reset_state:
             self.state = NetStat(
                 decay_factors=self.decay_factors,
@@ -56,14 +56,14 @@ class AfterImage(BaseTrafficFeatureExtractor):
             vectors.append(self.state.update_get_stats(*tv, fake_db))
         return vectors
 
-    def extract_features(self):
+    def extract_features(self, output_path=None):
         """main loop to extract the features. If state is set,
         change the time so that it is starts immediately after the benign
         traffic.
         for each packet, extract the traffic vectors and get features. Write to
         file every 10000 records
         """
-        self.setup()
+        self.setup(output_path=output_path)
 
         features_list = []
         meta_list = []
