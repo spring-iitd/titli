@@ -18,156 +18,186 @@ Basic Usage
 
    from titli.fe import AfterImage
    
-   # Initialize the feature extractor
+   # Extract features and output to CSV for DataLoader consumption
+   fe = AfterImage(file_path="traffic.pcap")
+   fe.extract_features(output_path="features.csv")
+
+With Custom Parameters
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from titli.fe import AfterImage
+   
    fe = AfterImage(
        file_path="path/to/traffic.pcap",
-       dataset_name="my_dataset",
        limit=float("inf"),  # Maximum number of records
        decay_factors=[5, 3, 1, 0.1, 0.01],  # Time windows
        max_pkt=float("inf")  # Maximum packets to process
    )
-   
-   # Extract features
-   features = fe.extract_features()
-   
-   # Save state for later use
-   fe.save_state("feature_extractor_state.pkl")
+   fe.extract_features(output_path="features.csv")
 
-Advanced Usage: Stateful Feature Extraction
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. note::
 
-You can save the state of the feature extractor after processing training data and reuse it for test data:
+   Feature extractors output CSV files that should be consumed via ``StreamingCSVDataset`` and ``DataLoader`` 
+   for model training. State management is now handled internally by the feature extractors.
 
-.. code-block:: python
+DataLoader Setup
+----------------
 
-   from titli.fe import AfterImage, NetStat
-   import pickle
-   
-   # Train phase: Extract features and save state
-   train_fe = AfterImage(
-       file_path="training.pcap",
-       dataset_name="train"
-   )
-   train_features = train_fe.extract_features()
-   
-   # Save the network state
-   with open("netstat_state.pkl", "wb") as f:
-       pickle.dump(train_fe.state, f)
-   
-   # Test phase: Load state and extract features
-   with open("netstat_state.pkl", "rb") as f:
-       saved_state = pickle.load(f)
-   
-   test_fe = AfterImage(
-       file_path="test.pcap",
-       dataset_name="test",
-       state=saved_state  # Reuse the saved state
-   )
-   test_features = test_fe.extract_features()
+StreamingCSVDataset
+~~~~~~~~~~~~~~~~~~~
 
-Training IDS Models
--------------------
-
-KitNET (Kitsune)
-~~~~~~~~~~~~~~~~
-
-KitNET is an ensemble of autoencoders designed for online anomaly detection.
+Create datasets from extracted features for efficient batch processing:
 
 .. code-block:: python
 
-   from titli.ids import KitsuneIDS
    from titli.utils import StreamingCSVDataset
    from torch.utils.data import DataLoader
    
-   # Prepare data loader
-   train_dataset = StreamingCSVDataset("train_features.csv")
-   train_loader = DataLoader(train_dataset, batch_size=1, shuffle=False)
-   
-   # Initialize KitNET
-   ids = KitsuneIDS(
-       dataset_name="my_dataset",
-       input_size=100,  # Number of features
-       max_autoencoder_size=10,
-       FM_grace_period=10000,  # Feature mapping period
-       AD_grace_period=50000,  # Anomaly detection training period
-       learning_rate=0.1,
-       hidden_ratio=0.75
+   # Create dataset
+   dataset = StreamingCSVDataset(
+       feature_csv_path="features.csv",
+       label_csv_path="labels.csv",
+       max_samples=100000,
+       label_column=0  # Column index containing labels
    )
    
-   # Train the model
-   ids.train_model(train_loader)
-   
-   # Save the trained model
-   ids.save_model("kitsune_model.pkl")
+   # Create DataLoader
+   train_loader = DataLoader(
+       dataset,
+       batch_size=32,
+       shuffle=False,
+       num_workers=2
+   )
 
-PyTorch-Based Kitsune
-~~~~~~~~~~~~~~~~~~~~~
+Batch Size Selection
+~~~~~~~~~~~~~~~~~~~~
 
-For GPU acceleration, use the PyTorch implementation:
+Choose appropriate batch sizes based on your use case:
 
 .. code-block:: python
 
-   from titli.ids import PyTorchKitsune
-   import torch
+   # Small batches for memory-constrained environments
+   train_loader = DataLoader(dataset, batch_size=16)
    
-   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   # Standard batches for most cases
+   train_loader = DataLoader(dataset, batch_size=32)
    
-   ids = PyTorchKitsune(
-       dataset_name="my_dataset",
-       input_size=100,
-       device=device
-   )
-   
-   ids.train_model(train_loader)
+   # Larger batches for inference (no gradients)
+   test_loader = DataLoader(test_dataset, batch_size=64)
 
-Scikit-learn Based Models
+Train/Test Split Patterns
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Local Outlier Factor (LOF)
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. code-block:: python
+
+   from torch.utils.data import random_split
+   
+   # Split dataset
+   train_size = int(0.8 * len(dataset))
+   test_size = len(dataset) - train_size
+   train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+   
+   train_loader = DataLoader(train_dataset, batch_size=32)
+   test_loader = DataLoader(test_dataset, batch_size=32)
+
+Model Training
+--------------
+
+All models follow the same 5-method workflow. Below are examples for each of the 6 available models.
+
+LOF (Local Outlier Factor)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Density-based anomaly detection using local outlier factors.
+
+**When to use**: Small to medium datasets with clear density-based outliers. Works well when anomalies 
+have significantly different local densities than normal samples.
+
+**Initialization**:
 
 .. code-block:: python
 
    from titli.ids import LOF
-   from sklearn.preprocessing import StandardScaler
+   import torch
    
-   # Initialize LOF
-   lof = LOF(
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = LOF(
        dataset_name="my_dataset",
        input_size=100,
-       device="cpu",
-       n_neighbors=20,
-       contamination=0.1
+       device=device
    )
-   
-   # Train the model
-   lof.train_model(train_loader)
 
-One-Class SVM
-^^^^^^^^^^^^^
+**Complete workflow**:
+
+.. code-block:: python
+
+   # Train
+   ids.train_model(train_loader)
+   
+   # Save
+   ids.save()
+   
+   # Load
+   ids.load()
+   
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
+
+OCSVM (One-Class SVM)
+~~~~~~~~~~~~~~~~~~~~~~
+
+Boundary-based anomaly detection using support vector machines.
+
+**When to use**: Datasets with clear decision boundaries. Effective for high-dimensional data 
+and when you want a well-defined separation between normal and anomalous regions.
+
+**Initialization**:
 
 .. code-block:: python
 
    from titli.ids import OCSVM
+   import torch
    
-   # Initialize OCSVM
-   ocsvm = OCSVM(
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = OCSVM(
        dataset_name="my_dataset",
        input_size=100,
-       device="cpu",
-       kernel='rbf',
-       gamma='auto',
-       nu=0.1
+       device=device
    )
-   
-   # Train the model
-   ocsvm.train_model(train_loader)
 
-Deep Learning Models
-~~~~~~~~~~~~~~~~~~~~
+**Complete workflow**:
+
+.. code-block:: python
+
+   # Train
+   ids.train_model(train_loader)
+   
+   # Save
+   ids.save()
+   
+   # Load
+   ids.load()
+   
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
 
 Autoencoder
-^^^^^^^^^^^
+~~~~~~~~~~~
+
+Deep learning reconstruction-based anomaly detection.
+
+**When to use**: Complex patterns in high-dimensional data, GPU available. Learns to reconstruct 
+normal patterns; anomalies produce higher reconstruction errors.
+
+**Initialization**:
 
 .. code-block:: python
 
@@ -175,166 +205,331 @@ Autoencoder
    import torch
    
    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-   
-   # Initialize Autoencoder
-   ae = Autoencoder(
+   ids = Autoencoder(
        dataset_name="my_dataset",
        input_size=100,
-       hidden_size=50,
-       device=device,
-       learning_rate=0.001,
-       num_epochs=50
+       device=device
    )
-   
-   # Train the model
-   ae.train_model(train_loader)
 
-Variational Autoencoder (VAE)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Complete workflow**:
+
+.. code-block:: python
+
+   # Train
+   ids.train_model(train_loader)
+   
+   # Save
+   ids.save()
+   
+   # Load
+   ids.load()
+   
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
+
+VAE (Variational Autoencoder)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Probabilistic deep learning with latent space modeling.
+
+**When to use**: When you need probabilistic anomaly scores or want to model the distribution 
+of normal data in a latent space. Better for capturing uncertainty than standard autoencoders.
+
+**Initialization**:
 
 .. code-block:: python
 
    from titli.ids import VAE
+   import torch
    
-   # Initialize VAE
-   vae = VAE(
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = VAE(
        dataset_name="my_dataset",
        input_size=100,
-       hidden_size=50,
-       latent_size=20,
        device=device
    )
-   
-   # Train the model
-   vae.train_model(train_loader)
 
-Inference and Evaluation
--------------------------
-
-Making Predictions
-~~~~~~~~~~~~~~~~~~
+**Complete workflow**:
 
 .. code-block:: python
 
-   # Load test data
-   test_dataset = StreamingCSVDataset("test_features.csv")
-   test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+   # Train
+   ids.train_model(train_loader)
    
-   # Load trained model
-   ids = KitsuneIDS.load_model("kitsune_model.pkl")
+   # Save
+   ids.save()
    
-   # Perform inference
-   anomaly_scores, predictions = ids.infer(test_loader)
+   # Load
+   ids.load()
    
-   # anomaly_scores: continuous anomaly scores
-   # predictions: binary predictions (0=normal, 1=anomaly)
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
 
-Evaluating Models
-~~~~~~~~~~~~~~~~~
+ICL (Instance Contrastive Learning)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Contrastive learning approach for anomaly detection.
+
+**When to use**: When you want to learn discriminative features through contrastive learning. 
+Effective for scenarios where normal samples should cluster together in feature space.
+
+**Initialization**:
 
 .. code-block:: python
 
-   from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+   from titli.ids import ICL
+   import torch
    
-   # Assuming you have true labels
-   true_labels = test_dataset.labels
-   
-   # Calculate metrics
-   accuracy = accuracy_score(true_labels, predictions)
-   precision = precision_score(true_labels, predictions)
-   recall = recall_score(true_labels, predictions)
-   f1 = f1_score(true_labels, predictions)
-   
-   print(f"Accuracy: {accuracy:.4f}")
-   print(f"Precision: {precision:.4f}")
-   print(f"Recall: {recall:.4f}")
-   print(f"F1-Score: {f1:.4f}")
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = ICL(
+       dataset_name="my_dataset",
+       input_size=100,
+       device=device
+   )
 
-Visualization
+**Complete workflow**:
+
+.. code-block:: python
+
+   # Train
+   ids.train_model(train_loader)
+   
+   # Save
+   ids.save()
+   
+   # Load
+   ids.load()
+   
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
+
+KitNET
+~~~~~~
+
+Ensemble of autoencoders for online anomaly detection.
+
+**When to use**: Online/streaming scenarios, ensemble methods needed. KitNET adaptively creates 
+an ensemble of small autoencoders, making it efficient for incremental learning.
+
+**Initialization**:
+
+.. code-block:: python
+
+   from titli.ids import KitNET
+   import torch
+   
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = KitNET(
+       dataset_name="my_dataset",
+       input_size=100,
+       device=device
+   )
+
+**Complete workflow**:
+
+.. code-block:: python
+
+   # Train
+   ids.train_model(train_loader)
+   
+   # Save
+   ids.save()
+   
+   # Load
+   ids.load()
+   
+   # Infer
+   y_true, y_pred, scores = ids.infer(test_loader)
+   
+   # Evaluate
+   ids.evaluate(test_loader)
+
+Model Persistence
+-----------------
+
+Save and Load Patterns
+~~~~~~~~~~~~~~~~~~~~~~
+
+All models use the same save/load interface:
+
+.. code-block:: python
+
+   # Save with default path
+   ids.save()  # Saves to ./artifacts/{dataset_name}/models/{model_name}.pth
+   
+   # Save with custom path
+   ids.save("custom_model_path.pth")
+   
+   # Load with default path
+   ids.load()  # Loads from ./artifacts/{dataset_name}/models/{model_name}.pth
+   
+   # Load from custom path
+   ids.load("custom_model_path.pth")
+
+Default Paths
 ~~~~~~~~~~~~~
 
-.. code-block:: python
-
-   import matplotlib.pyplot as plt
-   import numpy as np
-   
-   # Plot anomaly scores
-   plt.figure(figsize=(12, 4))
-   plt.plot(anomaly_scores)
-   plt.axhline(y=threshold, color='r', linestyle='--', label='Threshold')
-   plt.xlabel('Sample')
-   plt.ylabel('Anomaly Score')
-   plt.title('Anomaly Detection Results')
-   plt.legend()
-   plt.show()
-
-Advanced Topics
----------------
-
-Custom Feature Extractors
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To create a custom feature extractor, inherit from ``BaseTrafficFeatureExtractor``:
+Models are saved to standardized locations:
 
 .. code-block:: python
 
-   from titli.fe.base_feature_extractor import BaseTrafficFeatureExtractor
+   # For OCSVM with dataset_name="traffic_analysis"
+   # Default save path: ./artifacts/traffic_analysis/models/ocsvm.pth
    
-   class MyFeatureExtractor(BaseTrafficFeatureExtractor):
-       def __init__(self, file_path, dataset_name=None, **kwargs):
-           super().__init__(file_path=file_path, dataset_name=dataset_name, **kwargs)
-           # Initialize your custom parameters
-       
-       def extract_features(self):
-           # Implement your feature extraction logic
-           pass
+   # For Autoencoder with dataset_name="network_ids"
+   # Default save path: ./artifacts/network_ids/models/autoencoder.pth
 
-Working with Streaming Data
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For real-time or streaming scenarios:
+Custom Paths
+~~~~~~~~~~~~
 
 .. code-block:: python
 
-   from titli.utils import StreamingCSVDataset
+   # Save to custom location
+   ids.save("/path/to/my_model.pth")
    
-   # Create a streaming dataset
-   dataset = StreamingCSVDataset(
-       csv_path="features.csv",
-       chunk_size=1000  # Process in chunks
-   )
-   
-   # Process in batches
-   for batch in dataset:
-       features, labels = batch
-       # Process the batch
+   # Later, load from that location
+   ids.load("/path/to/my_model.pth")
 
-Data Preprocessing
-~~~~~~~~~~~~~~~~~~
+Inference Patterns
+------------------
+
+When to Use infer() vs evaluate()
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Use infer()** for:
+
+* Online detection and streaming scenarios
+* Custom workflows where you need raw predictions
+* Integration with external systems
+* When you don't need visualization or metrics files
 
 .. code-block:: python
 
-   from sklearn.preprocessing import StandardScaler
-   import numpy as np
+   # Lightweight inference - just get predictions
+   y_true, y_pred, scores = ids.infer(test_loader)
    
-   # Normalize features
-   scaler = StandardScaler()
-   normalized_features = scaler.fit_transform(features)
+   # Now use predictions in custom workflow
+   anomaly_rate = y_pred.sum() / len(y_pred)
+   print(f"Detected {anomaly_rate:.2%} anomalies")
+
+**Use evaluate()** for:
+
+* Benchmarking and model comparison
+* Generating reports with visualizations
+* Computing comprehensive metrics
+* Development and experimentation
+
+.. code-block:: python
+
+   # Full evaluation - generates all artifacts
+   ids.evaluate(test_loader)
+   # Creates:
+   # - ./artifacts/{dataset_name}/plots/confusion_matrix/{model}.png
+   # - ./artifacts/{dataset_name}/plots/roc/{model}.png
+   # - ./artifacts/{dataset_name}/plots/anomaly/{model}.png
+   # - ./artifacts/{dataset_name}/objects/metrics/{model}.txt
+
+Output Artifacts
+----------------
+
+Metrics Files
+~~~~~~~~~~~~~
+
+After calling ``evaluate()``, metrics are saved to:
+
+``./artifacts/{dataset_name}/objects/metrics/{model_name}.txt``
+
+Example content:
+
+.. code-block:: text
+
+   Accuracy:    0.956
+   Precision:   0.892
+   Recall(TPR): 0.847
+   F1 Score:    0.869
    
-   # Save scaler for later use
-   import pickle
-   with open("scaler.pkl", "wb") as f:
-       pickle.dump(scaler, f)
+   Confusion Matrix:
+   TP: 1234
+   TN: 8765
+   FP: 234
+   FN: 167
+   TPR (Recall): 0.847
+   FNR:          0.153
+   FPR:          0.026
+   TNR:          0.974
+   
+   AUC-ROC:      0.9234
+
+Plots
+~~~~~
+
+Three types of plots are generated:
+
+**1. Confusion Matrix**
+   ``./artifacts/{dataset_name}/plots/confusion_matrix/{model_name}.png``
+   
+   Shows true positives, false positives, true negatives, and false negatives.
+
+**2. ROC Curve**
+   ``./artifacts/{dataset_name}/plots/roc/{model_name}.png``
+   
+   Shows the trade-off between true positive rate and false positive rate.
+
+**3. Anomaly Score Plot**
+   ``./artifacts/{dataset_name}/plots/anomaly/{model_name}.png``
+   
+   Shows anomaly scores for all samples with the threshold line.
+
+File Naming Conventions
+~~~~~~~~~~~~~~~~~~~~~~~
+
+All output files follow consistent naming:
+
+.. code-block:: text
+
+   ./artifacts/
+   └── {dataset_name}/
+       ├── models/
+       │   ├── lof.pth
+       │   ├── ocsvm.pth
+       │   ├── autoencoder.pth
+       │   ├── vae.pth
+       │   ├── icl.pth
+       │   └── kitnet.pth
+       ├── objects/
+       │   └── metrics/
+       │       ├── lof.txt
+       │       ├── ocsvm.txt
+       │       └── ...
+       └── plots/
+           ├── confusion_matrix/
+           │   ├── lof.png
+           │   └── ...
+           ├── roc/
+           │   ├── lof.png
+           │   └── ...
+           └── anomaly/
+               ├── lof.png
+               └── ...
 
 Tips and Best Practices
 ------------------------
 
-1. **Grace Periods**: Set appropriate grace periods for KitNET based on your dataset size
-2. **Feature Scaling**: Always normalize/standardize features for better model performance
-3. **Threshold Selection**: Use validation data to select optimal anomaly thresholds
-4. **State Management**: Save and reuse feature extractor states for consistent testing
-5. **GPU Acceleration**: Use PyTorch-based models when you have GPU access
-6. **Batch Processing**: Process large datasets in batches to avoid memory issues
+1. **DataLoader Usage**: Always use DataLoaders for efficient batch processing
+2. **Batch Size**: Start with 32; increase for inference, decrease if memory constrained
+3. **Model Selection**: Try multiple models - the unified API makes this easy
+4. **Save Frequently**: Save models after training to avoid losing progress
+5. **Use infer() for Production**: Use ``infer()`` in production; ``evaluate()`` for development
+6. **GPU Acceleration**: Use GPU (``device="cuda"``) for deep learning models when available
 
 Troubleshooting
 ---------------
@@ -346,15 +541,16 @@ Common Issues
    Ensure the path to your PCAP file is correct and the file exists.
 
 **Out of Memory**
-   Reduce batch size or process data in chunks using streaming datasets.
+   Reduce batch size or use ``num_workers=0`` in DataLoader.
 
 **Model Not Converging**
-   Adjust learning rate, increase training epochs, or check data quality.
+   Deep learning models: Adjust learning rate or increase epochs.
+   Traditional ML: Check data preprocessing and scaling.
 
 **Poor Detection Performance**
    * Ensure proper feature normalization
-   * Verify grace periods are sufficient
-   * Check threshold selection
-   * Validate training data quality
+   * Try different models - some work better for specific data patterns
+   * Validate training data quality and representativeness
+   * Check threshold selection (automatically set, but dataset-dependent)
 
 For more examples, check the ``examples/`` directory in the `GitHub repository <https://github.com/spg-iitd/titli>`_.

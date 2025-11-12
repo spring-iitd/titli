@@ -5,219 +5,127 @@ The ``titli.ids`` module provides various intrusion detection system (IDS) model
 
 .. currentmodule:: titli.ids
 
-Overview
---------
+Public API Overview
+-------------------
 
-This module includes both traditional machine learning models (LOF, OCSVM) and deep learning models (Autoencoders, VAE) for anomaly detection. Each model follows a consistent interface for training, inference, and evaluation.
+All IDS models expose the following 5 public methods:
 
-Ensemble Models
----------------
+.. code-block:: python
 
-KitNET
-~~~~~~
+   def train_model(self, train_loader: DataLoader) -> None
+       """Train the model on training data."""
+   
+   def save(self, model_path: Optional[str] = None) -> None
+       """Save trained model to disk.
+       
+       Args:
+           model_path: Path to save model. If None, uses default path:
+                      ./artifacts/{dataset_name}/models/{model_name}.pth
+       """
+   
+   def load(self, model_path: Optional[str] = None) -> dict
+       """Load trained model from disk.
+       
+       Args:
+           model_path: Path to load model from. If None, uses default path.
+       
+       Returns:
+           Checkpoint dictionary with model state
+       """
+   
+   def infer(self, test_loader: DataLoader) -> Tuple[np.ndarray, np.ndarray, np.ndarray]
+       """Lightweight inference without metrics computation.
+       
+       Args:
+           test_loader: PyTorch DataLoader with test data
+       
+       Returns:
+           Tuple of (y_true, y_pred, reconstruction_errors):
+               - y_true: Ground truth labels
+               - y_pred: Binary predictions (0=benign, 1=anomaly)
+               - reconstruction_errors: Anomaly scores for each sample
+       """
+   
+   def evaluate(self, test_loader: DataLoader) -> None
+       """Full evaluation with metrics and visualization.
+       
+       Computes F1, Precision, Recall, Accuracy, AUC-ROC and generates:
+       - Confusion matrix plot
+       - ROC curve plot
+       - Anomaly score plot
+       - Metrics text file
+       
+       All artifacts saved to ./artifacts/{dataset_name}/
+       
+       Args:
+           test_loader: PyTorch DataLoader with test data
+       """
 
-.. autoclass:: KitNET
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
-
-KitsuneIDS
-~~~~~~~~~~
-
-.. autoclass:: KitsuneIDS
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
-
-TorchKitNET
-~~~~~~~~~~~
-
-.. autoclass:: TorchKitNET
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
-
-PyTorchKitsune
-~~~~~~~~~~~~~~
-
-.. autoclass:: PyTorchKitsune
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
+Available Models
+----------------
 
 Traditional ML Models
----------------------
+~~~~~~~~~~~~~~~~~~~~~
 
 LOF (Local Outlier Factor)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: LOF
-   :members:
-   :undoc-members:
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
 OCSVM (One-Class SVM)
-~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: OCSVM
-   :members:
-   :undoc-members:
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
 Deep Learning Models
---------------------
+~~~~~~~~~~~~~~~~~~~~
 
 Autoencoder
-~~~~~~~~~~~
+^^^^^^^^^^^
 
 .. autoclass:: Autoencoder
-   :members:
-   :undoc-members:
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
 VAE (Variational Autoencoder)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: VAE
-   :members:
-   :undoc-members:
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
-Other Models
-------------
-
-ICL (Incremental Correlation Learning)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ICL (Instance Contrastive Learning)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. autoclass:: ICL
-   :members:
-   :undoc-members:
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
-Base Classes
-------------
+Ensemble Models
+~~~~~~~~~~~~~~~
 
-BasePyTorchModel
-~~~~~~~~~~~~~~~~
+KitNET
+^^^^^^
 
-.. autoclass:: titli.ids.base_ids.BasePyTorchModel
-   :members:
-   :undoc-members:
+.. autoclass:: KitNET
+   :members: train_model, save, load, infer, evaluate
    :show-inheritance:
    :special-members: __init__
 
-BaseSKLearnModel
-~~~~~~~~~~~~~~~~
+Notes
+-----
 
-.. autoclass:: titli.ids.base_ids.BaseSKLearnModel
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
-
-Usage Examples
---------------
-
-KitNET Example
-~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from titli.ids import KitsuneIDS
-   from torch.utils.data import DataLoader
-   
-   # Initialize model
-   ids = KitsuneIDS(
-       dataset_name="my_dataset",
-       input_size=100,
-       max_autoencoder_size=10,
-       FM_grace_period=10000,
-       AD_grace_period=50000
-   )
-   
-   # Train
-   ids.train_model(train_loader)
-   
-   # Save
-   ids.save_model("model.pkl")
-   
-   # Inference
-   scores, predictions = ids.infer(test_loader)
-
-LOF Example
-~~~~~~~~~~~
-
-.. code-block:: python
-
-   from titli.ids import LOF
-   
-   lof = LOF(
-       dataset_name="my_dataset",
-       input_size=100,
-       device="cpu",
-       n_neighbors=20
-   )
-   
-   lof.train_model(train_loader)
-   scores, predictions = lof.infer(test_loader)
-
-Autoencoder Example
-~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-   from titli.ids import Autoencoder
-   import torch
-   
-   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-   
-   ae = Autoencoder(
-       dataset_name="my_dataset",
-       input_size=100,
-       hidden_size=50,
-       device=device,
-       learning_rate=0.001,
-       num_epochs=50
-   )
-   
-   ae.train_model(train_loader)
-   scores, predictions = ae.infer(test_loader)
-
-Model Comparison
-----------------
-
-+------------------+------------------+------------------+------------------+
-| Model            | Type             | GPU Support      | Online Learning  |
-+==================+==================+==================+==================+
-| KitNET           | Ensemble         | No               | Yes              |
-+------------------+------------------+------------------+------------------+
-| PyTorchKitsune   | Ensemble         | Yes              | Yes              |
-+------------------+------------------+------------------+------------------+
-| LOF              | Traditional ML   | No               | No               |
-+------------------+------------------+------------------+------------------+
-| OCSVM            | Traditional ML   | No               | No               |
-+------------------+------------------+------------------+------------------+
-| Autoencoder      | Deep Learning    | Yes              | No               |
-+------------------+------------------+------------------+------------------+
-| VAE              | Deep Learning    | Yes              | No               |
-+------------------+------------------+------------------+------------------+
-| ICL              | Correlation      | No               | Yes              |
-+------------------+------------------+------------------+------------------+
-
-Model Selection Guide
----------------------
-
-* **KitNET/PyTorchKitsune**: Best for online anomaly detection with high-dimensional data
-* **LOF**: Good for small to medium datasets with clear outliers
-* **OCSVM**: Suitable for datasets with clear decision boundaries
-* **Autoencoder/VAE**: Best for complex patterns and when GPU is available
-* **ICL**: Useful for incremental learning scenarios
+- All models inherit from either ``BaseSKLearnModel`` or ``PyTorchModel`` (internal base classes)
+- Methods prefixed with ``_`` are internal and not part of the public API
+- Default save paths: ``./artifacts/{dataset_name}/models/{model_name}.pth``
+- ``infer()`` returns: ``(y_true, y_pred, reconstruction_errors)`` as numpy arrays
+- ``evaluate()`` generates plots and metrics files in ``./artifacts/``

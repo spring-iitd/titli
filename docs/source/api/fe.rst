@@ -63,17 +63,14 @@ Usage Examples
 Basic Feature Extraction
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Extract features from a PCAP file:
+Extract features from a PCAP file and output to CSV for DataLoader usage:
 
 .. code-block:: python
 
    from titli.fe import AfterImage
    
-   fe = AfterImage(
-       file_path="traffic.pcap",
-       dataset_name="my_dataset"
-   )
-   features = fe.extract_features()
+   fe = AfterImage(file_path="traffic.pcap")
+   fe.extract_features(output_path="features.csv")
 
 With Custom Parameters
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -84,37 +81,37 @@ With Custom Parameters
    
    fe = AfterImage(
        file_path="traffic.pcap",
-       dataset_name="my_dataset",
        decay_factors=[5, 3, 1, 0.1, 0.01],
        max_pkt=100000,
        limit=10000
    )
-   features = fe.extract_features()
+   fe.extract_features(output_path="features.csv")
 
-Stateful Extraction
-~~~~~~~~~~~~~~~~~~~
+Integration with DataLoader
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Save and reuse the feature extractor state:
+Use extracted features with DataLoader for model training:
 
 .. code-block:: python
 
-   import pickle
    from titli.fe import AfterImage
+   from titli.utils import StreamingCSVDataset
+   from torch.utils.data import DataLoader
    
-   # Training phase
-   train_fe = AfterImage(file_path="train.pcap", dataset_name="train")
-   train_features = train_fe.extract_features()
+   # Extract features
+   fe = AfterImage(file_path="traffic.pcap")
+   fe.extract_features(output_path="features.csv")
    
-   with open("state.pkl", "wb") as f:
-       pickle.dump(train_fe.state, f)
-   
-   # Test phase
-   with open("state.pkl", "rb") as f:
-       state = pickle.load(f)
-   
-   test_fe = AfterImage(
-       file_path="test.pcap",
-       dataset_name="test",
-       state=state
+   # Load with DataLoader
+   dataset = StreamingCSVDataset(
+       feature_csv_path="features.csv",
+       label_csv_path="labels.csv",
+       label_column=0
    )
-   test_features = test_fe.extract_features()
+   loader = DataLoader(dataset, batch_size=32)
+
+.. note::
+
+   Feature extractors output CSV files that should be consumed via ``StreamingCSVDataset`` 
+   and ``DataLoader`` for model training. Direct use of extracted features is discouraged.
+   State management is now handled internally by the feature extractors.

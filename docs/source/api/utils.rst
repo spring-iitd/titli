@@ -51,30 +51,65 @@ Usage Examples
 Using StreamingCSVDataset
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Load and iterate over CSV data:
+Load and iterate over CSV data with separate feature and label files:
 
 .. code-block:: python
 
    from titli.utils import StreamingCSVDataset
    from torch.utils.data import DataLoader
    
-   # Create dataset
+   # Create dataset with feature and label CSV files
    dataset = StreamingCSVDataset(
-       csv_path="features.csv",
-       label_column="label"
+       feature_csv_path="features.csv",
+       label_csv_path="labels.csv",
+       max_samples=100000,
+       label_column=0  # Column index containing labels
    )
    
    # Create data loader
    loader = DataLoader(
        dataset,
        batch_size=32,
-       shuffle=False
+       shuffle=False,
+       num_workers=2
    )
    
    # Iterate over batches
    for features, labels in loader:
        # Process batch
        pass
+
+Standard Pattern with IDS Models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The standard workflow integrating StreamingCSVDataset with IDS models:
+
+.. code-block:: python
+
+   from titli.fe import AfterImage
+   from titli.utils import StreamingCSVDataset
+   from torch.utils.data import DataLoader
+   from titli.ids import OCSVM
+   import torch
+   
+   # Step 1: Extract features to CSV
+   fe = AfterImage(file_path="traffic.pcap")
+   fe.extract_features(output_path="features.csv")
+   
+   # Step 2: Create DataLoader
+   dataset = StreamingCSVDataset(
+       feature_csv_path="features.csv",
+       label_csv_path="labels.csv",
+       max_samples=100000,
+       label_column=0
+   )
+   train_loader = DataLoader(dataset, batch_size=32, shuffle=False, num_workers=2)
+   
+   # Step 3: Train and evaluate model
+   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+   ids = OCSVM(dataset_name="my_dataset", input_size=dataset.input_size, device=device)
+   ids.train_model(train_loader)
+   ids.evaluate(train_loader)
 
 Using RMSELoss
 ~~~~~~~~~~~~~~

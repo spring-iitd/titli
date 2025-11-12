@@ -23,11 +23,14 @@ and model evaluation of AI-based Intrusion Detection Systems (IDS).
 Overview
 --------
 
-Titli provides a modular framework for building and evaluating intrusion detection systems. It includes:
+Titli provides a modular framework for building and evaluating intrusion detection systems with a unified API. It includes:
 
-* **Feature Extractors**: Tools for extracting features from network traffic (e.g., AfterImage)
-* **IDS Models**: Various anomaly detection models (Kitsune, LOF, OCSVM, VAE, etc.)
-* **Utilities**: Helper functions for data processing, loss computation, and more
+* **6 IDS Models**: LOF, OCSVM, VAE, Autoencoder, ICL, KitNET
+* **Unified API**: All models expose 5 consistent methods (train_model, save, load, infer, evaluate)
+* **Efficient DataLoaders**: StreamingCSVDataset for large-scale data processing
+* **Comprehensive Evaluation**: Automatic metrics computation and visualization
+* **Easy Persistence**: Simple save/load model management with default paths
+* **Feature Extractors**: Tools for extracting features from network traffic (AfterImage, NetStat)
 
 Table of Contents
 -----------------
@@ -44,6 +47,7 @@ Table of Contents
    :maxdepth: 2
    :caption: API Reference
 
+   api_reference
    api/fe
    api/ids
    api/utils
