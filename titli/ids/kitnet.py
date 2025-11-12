@@ -565,7 +565,7 @@ class KitNET(PyTorchModel):
         # Calculate threshold using the torch model
         self.calculate_threshold(train_loader)
 
-        self._calculate_threshold_pytorch(train_loader)
+        #self._calculate_threshold_pytorch(train_loader)
         
         print("KitNET training completed!")
     
