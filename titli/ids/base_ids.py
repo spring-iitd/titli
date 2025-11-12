@@ -82,73 +82,38 @@ class BaseSKLearnModel:
 
         return y_test, y_pred, reconstruction_errors
     
+    def evaluate(self, test_loader):
+        """Comprehensive evaluation: compute metrics, generate plots, and save results.
         
-    # def evaluate(self, y_test, y_pred, reconstruction_errors):
-    #     # Compute confusion matrix
-    #     cm = confusion_matrix(y_test, y_pred)
-
-    #     # Compute evaluation metrics
-    #     f1 = round(f1_score(y_test, y_pred, zero_division=1), 3)
-    #     precision = round(precision_score(y_test, y_pred, zero_division=1), 3)
-    #     recall = round(recall_score(y_test, y_pred, zero_division=1), 3)
-    #     accuracy = round(accuracy_score(y_test, y_pred), 3)
-
-    #     results = {
-    #         "f1": f1,
-    #         "precision": precision,
-    #         "recall": recall,
-    #         "accuracy": accuracy,
-    #         "confusion_matrix": cm
-    #     }
-    #      # Print the evaluation metrics
-    #     print(f"F1 Score: {f1}")
-    #     print(f"Precision: {precision}")
-    #     print(f"Recall: {recall}")
-    #     print(f"Accuracy: {accuracy}")
-    #     metrics =f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}"+"_"+str(self.title)+".txt"
-
-    #     with open(metrics, "w") as file:
-    #         file.write(f"F1 Score: {f1}\n")
-    #         file.write(f"Precision: {precision}\n")
-    #         file.write(f"Recall: {recall}\n")
-    #         file.write(f"Accuracy: {accuracy}\n")
-         
-    #     self.plot(results)
-    #     device = "cpu"
+        This method performs complete model evaluation including:
+        - Computing all metrics (F1, Precision, Recall, Accuracy, AUC)
+        - Generating confusion matrix and ROC curve plots
+        - Saving metrics to file
         
-    #     # y_test = np.hstack(y_test)
-
-    #     # Compute ROC and AUC
-    #     count=0
-    #     for i in reconstruction_errors:
-    #         if(i>-.98):
-    #             count+=1
-    #     print("Number of anomalies detected: ",count)
-    #     fpr, tpr, thresholds = roc_curve(y_test, reconstruction_errors, pos_label=1)
-    #     roc_auc = auc(fpr, tpr)
-    #     print(f"AUC: {roc_auc:.4f}")
-
-    #     # Plot ROC curve
-    #     plt.figure(figsize=(8, 6))
-    #     plt.plot(fpr, tpr, color='darkorange', lw=2, label=f"ROC Curve (AUC = {roc_auc:.4f})")
-    #     plt.plot([0, 1], [0, 1], color='navy', lw=1, linestyle='--')
-    #     plt.xlim([0.0, 1.0])
-    #     plt.ylim([0.0, 1.05])
-    #     plt.xlabel('False Positive Rate')
-    #     plt.ylabel('True Positive Rate')
-    #     plt.title('Receiver Operating Characteristic')
-    #     plt.legend(loc='lower right')
-
-    #     # Save the plot
-    #     roc_save_path = f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}_{self.title}.png"
-    #     os.makedirs(os.path.dirname(roc_save_path), exist_ok=True)
-    #     plt.savefig(roc_save_path)
-    #     plt.close()
-
-    #     print(f"ROC curve saved to {roc_save_path}")
-    
-    
-    def evaluate(self, y_test, y_pred, reconstruction_errors):
+        For just getting predictions without metrics, use infer() instead.
+        
+        Args:
+            test_loader (DataLoader): DataLoader containing test data
+            
+        Returns:
+            None: Metrics and plots are saved to disk
+        """
+        print(f"Running {self.model_name} evaluation...")
+        
+        # Use infer to get predictions
+        y_test, y_pred, reconstruction_errors = self.infer(test_loader)
+        
+        # Ensure arrays are 1D
+        if y_test.ndim > 1:
+            y_test = y_test.ravel()
+        if y_pred.ndim > 1:
+            y_pred = y_pred.ravel()
+        
+        print(f"Evaluated {len(y_test)} samples")
+        print(f"Threshold: {self.threshold:.6f}")
+        
+        self.plot_anomaly(reconstruction_errors)
+        
         # Compute confusion matrix
         cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
         tn, fp, fn, tp = cm.ravel()
@@ -234,7 +199,6 @@ class BaseSKLearnModel:
             # Append AUC to metrics file
             with open(metrics_path, "a") as file:
                 file.write(f"\nAUC-ROC:      {roc_auc:.4f}\n")
-
 
     def plot(self, results):
         cm = results["confusion_matrix"]
@@ -348,6 +312,7 @@ class BaseSKLearnModel:
 
         # Show or save the plot
         plt.savefig(plot_path, dpi=300)
+        print(f"Anomaly plot saved to {plot_path}")
         plt.close()
 
 
@@ -380,8 +345,9 @@ class PyTorchModel(nn.Module):
         self.scaler.fit(all_train_data)
         for epoch in range(self.epochs):
             running_loss = 0.0
+            batch_count = 0
             for inputs, _ in tqdm(train_loader, desc=f"Training Epoch {epoch + 1}"):
-                inputs = inputs.to(self.device)
+                # inputs = inputs.to(self.device)
                 inputs_scaled = self.scaler.transform(inputs)  # Apply the same scaler used during training
                 inputs_scaled = torch.tensor(inputs_scaled, dtype=torch.float32).to(self.device) 
                 self.optimizer.zero_grad()
@@ -390,7 +356,9 @@ class PyTorchModel(nn.Module):
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
-            print(f"Epoch {epoch + 1}, Loss: {running_loss / len(train_loader)}")
+                batch_count += 1
+            avg_loss = running_loss / batch_count if batch_count else float(running_loss)
+            print(f"Epoch {epoch + 1}, Loss: {avg_loss}")
         self.calculate_threshold(train_loader)
 
     def save(self, model_path=None):
@@ -420,7 +388,7 @@ class PyTorchModel(nn.Module):
         reconstruction_errors = []
         with torch.no_grad():
             for inputs, _ in tqdm(train_loader, desc="Calculating threshold"):
-                inputs = inputs.to(self.device)
+                # inputs = inputs.to(self.device)
                 inputs_scaled = self.scaler.transform(inputs)  # Apply the same scaler used during training
                 inputs_scaled = torch.tensor(inputs_scaled, dtype=torch.float32).to(self.device)
                 outputs = self(inputs_scaled)
@@ -451,7 +419,7 @@ class PyTorchModel(nn.Module):
 
         with torch.no_grad():
             for inputs, labels in tqdm(test_loader, desc="Inferencing"):
-                inputs = inputs.to(self.device)
+                # inputs = inputs.to(self.device)
                 inputs_scaled = self.scaler.transform(inputs)  # Apply the same scaler used during training
                 inputs_scaled = torch.tensor(inputs_scaled, dtype=torch.float32).to(self.device) 
                 outputs = self(inputs_scaled)
@@ -463,91 +431,6 @@ class PyTorchModel(nn.Module):
                 # Apply threshold to each sample's reconstruction error and create binary prediction
                 y_pred.extend((loss > self.threshold).astype(int))
         return y_test, y_pred , reconstruction_errors
-
-    # def evaluate(self, y_test, y_pred, reconstruction_errors):
-    #     """
-    #     Evaluates the model on the test set, calculates evaluation metrics, and plots confusion matrix and ROC curve.
-    #     """
-    #     cm_save_path=f"./artifacts/{self.dataset_name}/plots/confusion_matrix/{self.model_name.lower()}"+"_"+str(self.title)+".png"
-    #     roc_save_path=f"./artifacts/{self.dataset_name}/plots/roc/{self.model_name.lower()}"+"_"+str(self.title)+".png"
-    #     threshold = self.threshold
-    #     print("Using the threshold of {:.2f}".format(threshold))
-    
-    #     cm = confusion_matrix(y_test, y_pred,labels=[0, 1])
-
-    #     # Compute evaluation metrics
-    #     f1 = round(f1_score(y_test, y_pred, zero_division=1), 3)
-    #     precision = round(precision_score(y_test, y_pred, zero_division=1), 3)
-    #     recall = round(recall_score(y_test, y_pred, zero_division=1), 3)
-    #     accuracy = round(accuracy_score(y_test, y_pred), 3)
-
-    #     # Print the evaluation metrics
-    #     print(f"F1 Score: {f1}")
-    #     print(f"Precision: {precision}")
-    #     print(f"Recall: {recall}")
-    #     print(f"Accuracy: {accuracy}")
-    #     metrics =f"./artifacts/{self.dataset_name}/objects/metrics/{self.model_name.lower()}"+"_"+str(self.title)+".txt"
-
-    #     with open(metrics, "w") as file:
-    #         file.write(f"F1 Score: {f1}\n")
-    #         file.write(f"Precision: {precision}\n")
-    #         file.write(f"Recall: {recall}\n")
-    #         file.write(f"Accuracy: {accuracy}\n")
-
-    #     def fmt(x):
-    #         # If value is less than 10,000 show with decimal precision
-    #         if x < 1e4:
-    #             return f"{x:.2f}"
-    #         else:  # Otherwise show in scientific notation
-    #             return f"{x:.2e}"
-    
-    #     # Plot heatmap with custom formatting for annotations
-    #     sns.heatmap(cm, annot=True, fmt="", cmap="Blues",
-    #                 xticklabels=["Benign", "Malicious"], yticklabels=["Benign", "Malicious"],
-    #                 annot_kws={"size": 12},
-    #                 cbar_kws={"format": plt.FuncFormatter(lambda x, _: fmt(x))})  # Format color bar
-    
-    #     # Modify annotations inside boxes to custom formatting
-    #     ax = plt.gca()
-    #     for text in ax.texts:
-    #         text_value = float(text.get_text())
-    #         text.set_text(fmt(text_value))
-
-    #     plt.xlabel("Predicted Labels")
-    #     plt.ylabel("True Labels")
-    #     plt.title("Confusion Matrix")
-    #     plt.savefig(cm_save_path)
-    #     plt.close()
-    #     print(f"Confusion matrix saved to {cm_save_path}")
-
-    #     # --- ROC Curve and EER Calculation ---
-    #     if np.sum(y_test) == 0 or np.sum(y_test) == len(y_test):
-    #         print("Warning: ROC curve cannot be computed because y_test contains only one class.")
-    #     else:
-    #         fpr, tpr, thresholds = roc_curve(y_test, reconstruction_errors)
-    #         roc_auc = auc(fpr, tpr)
-
-    #         eer_index = np.nanargmin(np.abs(fpr - (1 - tpr)))
-    #         eer_threshold = thresholds[eer_index]
-    #         eer = fpr[eer_index]
-
-    #         # --- ROC Curve Plot ---
-    #         plt.figure(figsize=(7, 6))
-    #         plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {roc_auc:.3f})", color="blue")
-    #         plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
-    #         plt.scatter(fpr[eer_index], tpr[eer_index], color='red', label=f"EER = {eer:.3f} at Threshold = {eer_threshold:.3f}")
-    #         plt.xlabel("False Positive Rate (FPR)")
-    #         plt.ylabel("True Positive Rate (TPR)")
-    #         plt.title("ROC Curve with EER")
-    #         plt.legend()
-    #         plt.grid()
-    #         plt.savefig(roc_save_path)
-    #         plt.close()
-    #         print(f"ROC curve saved to {roc_save_path}")
-
-    #         # Display AUC and EER values in decimal format
-    #         print(f"AUC: {roc_auc:.3f}, EER: {eer:.3f} at threshold {eer_threshold:.3f}")
-    
     
     def evaluate(self, y_test, y_pred, reconstruction_errors):
         """
@@ -654,7 +537,6 @@ class PyTorchModel(nn.Module):
     
     def plot_anomaly(self, anomaly_score):
 
-      
         plt.figure(figsize=(12, 8))
 
         # Generate indices for the x-axis
@@ -670,7 +552,7 @@ class PyTorchModel(nn.Module):
         label="Malicious",
         alpha=1,
         s=1.5
-    )
+        )
 
         # Plot the threshold line
         plt.axhline(y=self.threshold, color="blue", linestyle="--", label="Threshold")
@@ -709,5 +591,5 @@ class PyTorchModel(nn.Module):
 
         # Show or save the plot
         plt.savefig(plot_path, dpi=300)
+        print(f"Anomaly plot saved to {plot_path}")
         plt.close()
-

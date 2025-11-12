@@ -132,6 +132,44 @@ class ICL(PyTorchModel):
                 reconstruction_errors.extend(loss.cpu().numpy().tolist())
         
         return y_true, y_pred, reconstruction_errors
+    
+    def evaluate(self, test_loader):
+        """Comprehensive evaluation: compute metrics, generate plots, and save results.
+        
+        This method performs complete model evaluation including:
+        - Computing all metrics (F1, Precision, Recall, Accuracy, AUC)
+        - Generating confusion matrix and ROC curve plots
+        - Saving metrics to file
+        
+        For just getting predictions without metrics, use infer() instead.
+        
+        Args:
+            test_loader (DataLoader): DataLoader containing test data
+            
+        Returns:
+            None: Metrics and plots are saved to disk
+        """
+        print("Running ICL evaluation...")
+        
+        # Use infer to get predictions
+        y_test, y_pred, reconstruction_errors = self.infer(test_loader)
+        
+        # Convert to numpy arrays if they aren't already
+        y_test = np.array(y_test) if not isinstance(y_test, np.ndarray) else y_test
+        y_pred = np.array(y_pred) if not isinstance(y_pred, np.ndarray) else y_pred
+        
+        # Ensure arrays are 1D
+        if y_test.ndim > 1:
+            y_test = y_test.ravel()
+        if y_pred.ndim > 1:
+            y_pred = y_pred.ravel()
+        
+        print(f"Evaluated {len(y_test)} samples")
+        print(f"Threshold: {self.threshold:.6f}")
+        
+        self.plot_anomaly(reconstruction_errors)
+        # Call parent evaluate method (computes metrics and generates plots)
+        super().evaluate(y_test, y_pred, reconstruction_errors)
 
 
 def main():

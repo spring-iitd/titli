@@ -1,42 +1,26 @@
-from abc import ABC, abstractmethod
-from pathlib import Path
-# from utils import *
-from scapy.all import *
-import pickle
+"""Base feature extractor for network traffic analysis."""
 
 import json
+import pickle
+from abc import ABC, abstractmethod
 from io import TextIOWrapper
+from pathlib import Path
 
-# class LazyInitializationMixin:
-#     def lazy_init(self, **kwargs):
-        
-#         for k, v in kwargs.items():
-#             if k in self.allowed:
-#                 setattr(self, k, v)
-#             else:
-#                 raise ValueError(f"{k} not allowed")
-#             setattr(self, k, v)
-#             self.allowed.remove(k)
-
-#     def start(self, **kwargs):
-#         assigned=list(self.allowed)
-#         for k, v in kwargs.items():
-#             if k in self.allowed:
-#                 setattr(self, k, v)
-#             else:
-#                 raise ValueError(f"{k} not allowed")
-#             assigned.remove(k)
-
-#         if len(assigned)>0:
-#             raise ValueError("Must assign the following variables",",".join(assigned))
-
-#         return self.entry()
-
-#     def __rrshift__(self, other):
-#         return self.start(**other)
+import numpy as np
+from scapy.all import PcapReader
 
 class JSONEncoder(json.JSONEncoder):
+    """Custom JSON encoder for handling Path, TextIOWrapper, and numpy types."""
+    
     def default(self, obj):
+        """Convert non-serializable objects to JSON-serializable format.
+        
+        Args:
+            obj: Object to serialize
+            
+        Returns:
+            JSON-serializable representation of the object
+        """
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, TextIOWrapper):
@@ -45,91 +29,103 @@ class JSONEncoder(json.JSONEncoder):
             return float(obj)
         return super().default(obj)
 
-def load_dataset_info():
-    with open("./datasets/data_info.json", "r") as f:
-        data_info = json.load(f)
-    return data_info
-
-def save_dataset_info(data_info):
-    with open("./datasets/data_info.json", "w") as f:
-        json.dump(data_info, f, indent=4, cls=JSONEncoder)
-
 class BaseTrafficFeatureExtractor(ABC):
+    """Abstract base class for network traffic feature extraction.
+    
+    This class provides the framework for extracting features from network traffic
+    captured in PCAP files. Subclasses must implement the abstract methods to define
+    specific feature extraction logic.
+    
+    Attributes:
+        file_path (str): Path to the input PCAP file
+        state: Optional pre-existing state to continue from previous extraction
+        feature_file: Output file handle for extracted features
+        meta_file: Output file handle for traffic vector metadata
+        count (int): Number of packets successfully processed
+        skipped (int): Number of packets skipped during processing
+    """
+    
     def __init__(self, file_path, dataset_name=None, state=None, **kwargs):
-        """base feature extractor. file_path is required, dataset_name and state are optional.
+        """Initialize the feature extractor.
         
         Args:
-            file_path (str): Path to the pcap file (required)
-            dataset_name (str, optional): Name of the dataset. Defaults to None.
-            state (NetStat, optional): Pre-existing state to continue from. Defaults to None.
+            file_path (str): Path to the PCAP file to process
+            dataset_name (str, optional): Name of the dataset (deprecated, not used)
+            state (NetStat, optional): Pre-existing state to continue from. If None,
+                starts fresh extraction
+            **kwargs: Additional arguments for subclass customization
         """
         self.file_path = file_path
-        # self.dataset_name = dataset_name
         self.state = state
-        # self.entry = self.extract_features
 
     @abstractmethod
     def update(self, traffic_vector):
-        """Updates the feature extractor with traffic_vector, and returns
-        the features
+        """Update the feature extractor with a new traffic vector.
+        
+        This method processes a traffic vector and updates the internal state
+        of the feature extractor, returning the computed features.
 
         Args:
-            traffic_vector (array): traffic vector extracted from the packets
+            traffic_vector (np.ndarray): Traffic vector extracted from packet(s)
+            
+        Returns:
+            np.ndarray: Extracted features corresponding to the traffic vector
         """
         pass
 
     @abstractmethod
     def peek(self, traffic_vectors):
-        """applies fake update to the feature extractor, does not actually
-        update the state of feature extractor. Not required but used for adversarial attack.
-        returns a list of features corresonding to the traffic vectors
+        """Simulate feature extraction without updating internal state.
+        
+        This method performs a "dry run" of feature extraction without modifying
+        the extractor's state. Useful for adversarial attacks or what-if analysis.
 
         Args:
-            traffic_vectors (list of array): list of traffic vectors to be updated
+            traffic_vectors (list): List of traffic vectors to process
+            
+        Returns:
+            list: List of features corresponding to each traffic vector
         """
         pass
 
     @abstractmethod
     def get_traffic_vector(self, packet):
-        """extracts traffic vectors from the raw packet,
-        returns the extracted traffic vector.
+        """Extract traffic vector from a raw network packet.
 
         Args:
-            packet (scapy packet): input packet
+            packet (scapy.packet.Packet): Input packet to process
+            
+        Returns:
+            np.ndarray or None: Extracted traffic vector, or None if packet should be skipped
         """
         pass
 
-    def setup(self, output_path):
-        """set up the feature extractor. By default it opens the input pcap
-        file, the output feature csv file, output meta data (AKA traffic vector) csv file,
-        and sets the state of the extractor.
-        It also initializes count (number of packets processed), skipped (number of
-        packets skipped), and written (number of features extracted)
+    def setup(self, output_path=None):
+        """Set up the feature extractor for processing.
+        
+        Opens the input PCAP file, creates output CSV files for features and metadata,
+        and initializes processing counters and state management flags.
+        
+        Args:
+            output_path (str or Path, optional): Custom path for the output feature file.
+                If None, creates the feature file in the same directory as the input PCAP
+                with a .csv extension. The metadata file will be created with a '_meta.csv'
+                suffix in the same directory.
+                
+        Side Effects:
+            - Opens input PCAP file for reading
+            - Creates and opens feature and metadata CSV files for writing
+            - Initializes count, skipped counters to 0
+            - Sets state management flags based on whether pre-existing state was provided
         """
-        # self.path = Path(
-        #     f"../../datasets/{self.dataset_name}/pcap/{self.file_name}.pcap"
-        # )
-
-        # feature_file = Path(
-        #     f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}.csv"
-        # )
-        # feature_file.parent.mkdir(parents=True, exist_ok=True)
-        # meta_file = Path(
-        #     f"../../datasets/{self.dataset_name}/{self.name}/{self.file_name}_meta.csv"
-        # )
-        # meta_file.parent.mkdir(parents=True, exist_ok=True)
-
         self.path = Path(self.file_path)
+        
         if output_path is not None:
             feature_file = Path(output_path)
             meta_file = feature_file.parent / (feature_file.stem + "_meta.csv")
         else:
             feature_file = self.path.with_suffix(".csv")
             meta_file = self.path.parent / (self.path.stem + "_meta.csv")
-
-        # Ensure parent directories exist
-        # feature_file.parent.mkdir(parents=True, exist_ok=True)
-        # meta_file.parent.mkdir(parents=True, exist_ok=True)
 
         self.feature_file = open(feature_file, "w")
         self.meta_file = open(meta_file, "w")
@@ -138,7 +134,6 @@ class BaseTrafficFeatureExtractor(ABC):
 
         self.count = 0
         self.skipped = 0
-
 
         self.input_pcap = PcapReader(str(self.path))
 
@@ -154,46 +149,42 @@ class BaseTrafficFeatureExtractor(ABC):
 
     @abstractmethod
     def get_headers(self):
-        """returns the names of the features"""
+        """Get the column names for the feature CSV file.
+        
+        Returns:
+            list[str]: List of feature column names
+        """
         pass
 
     @abstractmethod
     def get_meta_headers(self):
-        """returns the names of the traffic vectors"""
+        """Get the column names for the metadata/traffic vector CSV file.
+        
+        Returns:
+            list[str]: List of metadata column names
+        """
         pass
 
     def teardown(self):
-        """closes the opened files, write the files in the dataset_info json
-        file, save the state.
+        """Clean up resources and finalize feature extraction.
+        
+        Closes all open files (PCAP input, feature output, metadata output),
+        prints processing statistics, and saves the extractor state if configured.
+        
+        Side Effects:
+            - Closes all open file handles
+            - Prints processing statistics (skipped, processed, written counts)
+            - Saves state to 'state.pkl' in the PCAP directory if save_state is True
         """
         self.meta_file.close()
         self.feature_file.close()
         self.input_pcap.close()
-        # # save file information
-        # data_info = load_dataset_info()
-
-        # if self.dataset_name not in data_info.keys():
-        #     data_info[self.dataset_name] = {}
-
-        # if self.name not in data_info[self.dataset_name].keys():
-        #     data_info[self.dataset_name][self.name] = {}
-
-        # data_info[self.dataset_name][self.name][self.file_name] = {
-        #     "pcap_path": self.path,
-        #     "feature_path": self.feature_file,
-        #     "meta_path": self.meta_file,
-        #     "num_rows": self.count,
-        # }
-
-        # save_dataset_info(data_info)
+        
         print(
             f"skipped: {self.skipped} processed: {self.count+self.skipped} written: {self.count}"
         )
 
         if self.save_state:
-            # state_path = Path(
-            #     f"../../datasets/{self.dataset_name}/{self.name}/state.pkl"
-            # )
             state_path = self.path.parent / "state.pkl"
             state_path.parent.mkdir(parents=True, exist_ok=True)
             with open(state_path, "wb") as pf:
@@ -201,8 +192,12 @@ class BaseTrafficFeatureExtractor(ABC):
 
     @abstractmethod
     def extract_features(self):
-        """The main entry point of feature extractor, this function
-        should define the process of extracting the features from input
-        pcap file
+        """Main entry point for feature extraction from PCAP file.
+        
+        This method should implement the complete feature extraction pipeline:
+        reading packets from the input PCAP, extracting traffic vectors,
+        computing features, and writing results to output files.
+        
+        Must call setup() before and teardown() after processing.
         """
         pass

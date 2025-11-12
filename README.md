@@ -47,5 +47,8 @@ pip install titli
 - [ ] Resolve BaseSKLearn class infer function's TODO
 - [ ] Make fit and predict function as private by putting "_" in the starting
 - [ ] Similar to PyTorch, define __call__ function for SkLearn models too
+- [ ] Investigate and modify the use of get_model in the Pytorch class.
+- [ ] Make internal methods private
+- [ ] Add docstrings in the class and functions
 
 - Write where the model is saved in the print statement!
