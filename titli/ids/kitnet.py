@@ -565,7 +565,7 @@ class KitNET(PyTorchModel):
         # Calculate threshold using the torch model
         self.calculate_threshold(train_loader)
 
-        self._calculate_threshold_pytorch(train_loader)
+        # self._calculate_threshold_pytorch(train_loader)
         
         print("KitNET training completed!")
     
@@ -670,6 +670,65 @@ class KitNET(PyTorchModel):
         print(f"Threshold set to: {self.threshold}")
     
     def infer(self, test_loader):
+        """
+        Perform inference on test data using the numpy model (same approach as evaluate).
+        
+        This method uses the numpy model's execute() method for consistency with training.
+        It processes samples individually and returns predictions and anomaly scores.
+        
+        Args:
+            test_loader (DataLoader): DataLoader containing test data
+            
+        Returns:
+            tuple: (y_test, y_pred, reconstruction_errors)
+                - y_test (np.ndarray): Ground truth labels
+                - y_pred (np.ndarray): Predicted labels (0=benign, 1=anomaly)
+                - reconstruction_errors (np.ndarray): Anomaly scores for each sample
+        """
+        if self.numpy_model is None:
+            raise RuntimeError("Numpy model not initialized. Train or load model first.")
+            
+        print(f"Using threshold: {self.threshold}")
+        y_test = []
+        y_pred = []
+        reconstruction_errors = []
+        
+        # Process batches
+        for inputs, labels in tqdm(test_loader, desc="Inference"):
+            # Process each sample individually with numpy model
+            for i in range(inputs.shape[0]):
+                sample = inputs[i].numpy()
+                label = labels[i].numpy()
+                
+                # Scale input
+                sample_scaled = self.scaler.transform(sample.reshape(1, -1)).flatten()
+                
+                # Get anomaly score using numpy model
+                anomaly_score = self.numpy_model.execute(sample_scaled)
+                
+                if anomaly_score is not None:  # Only process if not in training phase
+                    # Get prediction based on threshold
+                    prediction = 1.0 if anomaly_score > self.threshold else 0.0
+                    
+                    # Store results
+                    y_test.append(label)
+                    y_pred.append(prediction)
+                    reconstruction_errors.append(anomaly_score)
+        
+        # Convert to numpy arrays
+        y_test = np.array(y_test)
+        y_pred = np.array(y_pred)
+        reconstruction_errors = np.array(reconstruction_errors)
+        
+        # Ensure labels are 1D
+        if y_test.ndim > 1:
+            y_test = y_test.ravel()
+        if y_pred.ndim > 1:
+            y_pred = y_pred.ravel()
+        
+        return y_test, y_pred, reconstruction_errors
+    
+    def infer_pytorch_old(self, test_loader):
         """Inference using the PyTorch model"""
         if self.torch_model is None:
             raise RuntimeError("PyTorch model not initialized. Train or load model first.")
@@ -802,6 +861,30 @@ class KitNET(PyTorchModel):
         
         self.torch_model.load_state_dict(checkpoint['model_state_dict'])
         self.torch_model.to(self.device)
+
+        # Load the saved numpy model from pickle (this preserves all the trained state)
+        if os.path.exists(self.numpy_model_path):
+            with open(self.numpy_model_path, 'rb') as f:
+                saved_data = pickle.load(f)
+                self.numpy_model = saved_data['model']
+            print(f"Numpy model loaded from {self.numpy_model_path}")
+        else:
+            # Fallback: recreate with weights if pickle file doesn't exist
+            print(f"Warning: Numpy model pickle not found at {self.numpy_model_path}")
+            print("Recreating numpy model (may not have correct normalization parameters)")
+            self.numpy_model = NumpyKitNET(
+                n=self.input_size,
+                max_autoencoder_size=self.max_autoencoder_size,
+                FM_grace_period=self.FM_grace_period,
+                AD_grace_period=self.AD_grace_period,
+                learning_rate=self.learning_rate,
+                hidden_ratio=self.hidden_ratio,
+                model_path=self.numpy_model_path,
+                feature_map=self.clusters
+            )
+            # Set the weights from the checkpoint
+            if weights is not None:
+                self.numpy_model.set_params(weights)
         
         print(f"KitNET model loaded from {model_path}")
         return checkpoint
@@ -874,8 +957,9 @@ class KitNET(PyTorchModel):
         if y_pred.ndim > 1:
             y_pred = y_pred.ravel()
         
+        self.plot_anomaly(reconstruction_errors)
         # Call the parent evaluate method
-        return super().evaluate(y_test, y_pred, reconstruction_errors)
+        super().evaluate(y_test, y_pred, reconstruction_errors)
 
 
 # Legacy compatibility - alias for the standardized version
