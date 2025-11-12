@@ -822,7 +822,7 @@ class KitNET(PyTorchModel):
 
     def evaluate(self, test_loader):
         """
-        Evaluates the model on test data from a DataLoader using the numpy model for consistency.
+        Evaluates the model on test data and plots the anomaly scores for both benign and malicious samples.
         """
         if self.numpy_model is None:
             raise RuntimeError("Numpy model not initialized")
@@ -831,52 +831,97 @@ class KitNET(PyTorchModel):
         y_test = []
         y_pred = []
         reconstruction_errors = []
+
+        benign_scores = []
+        benign_indices = []
+        malicious_scores = []
+        malicious_indices = []
         
-        sample_count = 0
+        global_index = 0  
+        
         for batch_idx, (inputs, labels) in enumerate(test_loader):
             if batch_idx % 50 == 0:
                 print(f"Processing batch {batch_idx+1}")
-            
-            # Process each sample individually with numpy model
+
             for i in range(inputs.shape[0]):
                 sample = inputs[i].numpy()
                 label = labels[i].numpy()
-                
-                # Scale input
+
                 sample_scaled = self.scaler.transform(sample.reshape(1, -1)).flatten()
-                
-                # Get anomaly score using numpy model
+   
                 anomaly_score = self.numpy_model.execute(sample_scaled)
                 
-                if anomaly_score is not None:  # Only process if not in training phase
-                    # Get prediction based on threshold
+                if anomaly_score is not None:
                     prediction = 1.0 if anomaly_score > self.threshold else 0.0
-                    
-                    # Store results
+
                     y_test.append(label)
                     y_pred.append(prediction)
                     reconstruction_errors.append(anomaly_score)
+
+                    if label == 0: 
+                        benign_scores.append(anomaly_score)
+                        benign_indices.append(global_index)
+                    else:  
+                        malicious_scores.append(anomaly_score)
+                        malicious_indices.append(global_index)
+
+                    global_index += 1
                     
-                    sample_count += 1
-                    if sample_count >= 10000:  # Limit to avoid too much processing
-                        break
-            
-            if sample_count >= 10000:
-                break
-        
-        y_test = np.array(y_test)
-        y_pred = np.array(y_pred)
+        y_test = np.array(y_test).ravel()
+        y_pred = np.array(y_pred).ravel()
         reconstruction_errors = np.array(reconstruction_errors)
         
-        # Ensure labels are 1D
-        if y_test.ndim > 1:
-            y_test = y_test.ravel()
-        if y_pred.ndim > 1:
-            y_pred = y_pred.ravel()
-        
-        # Call the parent evaluate method
-        return super().evaluate(y_test, y_pred, reconstruction_errors)
+        title = self.title
+        print(f"the threshold being use is {self.threshold}")
 
+        plt.figure(figsize=(12, 6))
+
+        benign_scores_np = np.array(benign_scores)
+        malicious_scores_np = np.array(malicious_scores)
+        
+        clipped_benign_scores = np.clip(benign_scores_np, a_min=1e-9, a_max=10.0)
+        clipped_malicious_scores = np.clip(malicious_scores_np, a_min=1e-9, a_max=10.0)
+
+        plt.scatter(
+            benign_indices,
+            clipped_benign_scores,
+            c='black',  
+            label="Benign",
+            alpha=0.6,
+            s=1.5
+        )
+
+        plt.scatter(
+            malicious_indices,
+            clipped_malicious_scores,
+            c='red',
+            label="Malicious",
+            alpha=1.0,
+            s=1.5
+        )
+
+        plt.axhline(y=self.threshold, color="blue", linestyle="--", label="Threshold")
+        plt.text(0, self.threshold*1.1, f'Threshold: {self.threshold:.4f}', color='blue', fontsize=12, fontweight='bold')
+
+        plt.title(title, fontsize=20, fontweight='bold')
+        plt.xlabel("Packet Index", fontsize=15, fontweight='bold')
+        plt.ylabel("Anomaly Score", fontsize=15, fontweight='bold')
+        plt.yscale("log")
+        #plt.ylim(top=10)
+
+        plt.xticks(fontsize=14)
+        plt.yticks(fontsize=14)
+        plt.grid(True, linestyle='--', alpha=0.7)
+
+        plt.legend(fontsize=14, loc='upper right')
+
+        plt.tight_layout()
+        plot_path = f"./artifacts/{self.dataset_name}/plots/anomaly/{self.model_name.lower()}_{str(self.title)}_combined.png"
+        plt.savefig(plot_path, dpi=300)
+        plt.close()
+        
+        # Call the parent evaluate method (ensure it accepts 1D numpy arrays)
+        return super().evaluate(y_test, y_pred, reconstruction_errors)
 
 # Legacy compatibility - alias for the standardized version
 class KitsuneIDS(KitNET):
