@@ -1,7 +1,5 @@
 <img src="assets/images/ titli-logo.png" alt="Titli Logo" width="150" />
 
-<br>
-
 
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/titli)
 ![PyPI - Version](https://img.shields.io/pypi/v/titli)
