@@ -185,21 +185,77 @@ class VAE(PyTorchModel):
 
         print(f"Threshold: {self.threshold}")
 
-    def infer(self, dataloader):
+    def infer(self, test_loader):
+        """Perform inference on test data to get predictions and anomaly scores.
+        
+        This is a lightweight method for getting raw predictions without 
+        computing metrics or generating plots. Useful for:
+        - Custom evaluation workflows
+        - Online/streaming inference
+        - Plotting anomaly scores with plot_anomaly()
+        
+        Args:
+            test_loader (DataLoader): DataLoader containing test data
+            
+        Returns:
+            tuple: (y_true, y_pred, reconstruction_errors)
+                - y_true (np.ndarray): Ground truth labels
+                - y_pred (np.ndarray): Predicted labels (0=benign, 1=anomaly)
+                - reconstruction_errors (list): Anomaly scores for each sample
+        """
         self.eval()
         y_true, y_pred, reconstruction_errors = [], [], []
+        
         with torch.no_grad():
-            for x, y in dataloader:
+            for x, y in test_loader:
                 x = x.to(self.device)
                 x_scaled = self.simple_scaler.transform(x).to(self.device)
                 recon, _, _ = self(x_scaled)
-                errors = self.reconstruction_error(recon, x_scaled)  # Use consistent method
+                errors = self.reconstruction_error(recon, x_scaled)
                 errors_np = errors.cpu().numpy()
                 reconstruction_errors.extend(errors_np)
                 y_true.extend(y.numpy())
                 y_pred.extend((errors_np > self.threshold).astype(int))
 
         return np.array(y_true), np.array(y_pred), reconstruction_errors
+
+    def evaluate(self, test_loader):
+        """Comprehensive evaluation: compute metrics, generate plots, and save results.
+        
+        This method performs complete model evaluation including:
+        - Computing all metrics (F1, Precision, Recall, Accuracy, AUC, EER)
+        - Generating confusion matrix and ROC curve plots
+        - Saving metrics to file
+        
+        For just getting predictions without metrics, use infer() instead.
+        
+        Args:
+            test_loader (DataLoader): DataLoader containing test data
+            
+        Returns:
+            dict: Dictionary containing:
+                - y_true: Ground truth labels
+                - y_pred: Predicted labels  
+                - reconstruction_errors: Anomaly scores
+                - metrics: Dictionary of computed metrics
+        """
+        print("Running VAE evaluation...")
+        
+        # Use infer to get predictions
+        y_test, y_pred, reconstruction_errors = self.infer(test_loader)
+        
+        # Ensure arrays are 1D
+        if y_test.ndim > 1:
+            y_test = y_test.ravel()
+        if y_pred.ndim > 1:
+            y_pred = y_pred.ravel()
+        
+        print(f"Evaluated {len(y_test)} samples")
+        print(f"Threshold: {self.threshold:.6f}")
+        
+        self.plot_anomaly(reconstruction_errors)
+        # Call parent evaluate method (computes metrics and generates plots)
+        super().evaluate(y_test, y_pred, reconstruction_errors)
 
     def predict_single(self, features):
         """
@@ -287,7 +343,17 @@ if __name__ == "__main__":
     model = VAE(dataset_name=dataset_name, input_size=100, device="cpu")
     model.train_model(dataloader)
     model.save()
-    model.load()
-    y_true, y_pred, reconstruction_errors = model.infer(dataloader)
-    print(len(y_true), len(y_pred))
-    model.evaluate(y_true, y_pred, reconstruction_errors)
+    
+    # Demonstrate API usage patterns:
+    
+    # Option 1: Complete evaluation (recommended for most users)
+    print("\n=== Complete Evaluation ===")
+    results = model.evaluate(dataloader)
+    print(f"Predictions: {results['y_pred'][:5]}")  # First 5 predictions
+    
+    # Option 2: Just get predictions (for custom workflows)
+    print("\n=== Custom Workflow ===")
+    y_true, y_pred, errors = model.infer(dataloader)
+    model.plot_anomaly(errors)  # Custom anomaly score plot
+    print(f"Custom analysis: Anomaly rate = {y_pred.sum() / len(y_pred):.2%}")
+
