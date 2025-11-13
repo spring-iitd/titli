@@ -1,4 +1,4 @@
-<img src="assets/images/ titli-logo.png" alt="Titli Logo" width="150" />
+<img src="assets/images/titli-logo-yellow-white.png" alt="Titli Logo" width="200" />
 
 
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/titli)
