@@ -1,0 +1,27 @@
+# Neural Network Training Framework for PCAP Data Analysis
+# Requirements file for Python dependencies
+
+# Core ML/Data Science
+torch>=1.9.0
+torchvision>=0.10.0
+pandas>=1.3.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+
+# Visualization and Logging
+matplotlib>=3.4.0
+seaborn>=0.11.0
+tensorboard>=2.7.0
+
+# Progress bars and utilities
+tqdm>=4.62.0
+
+# Network packet analysis
+scapy>=2.4.5
+
+# Optional but recommended
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Additional utilities
+pathlib2>=2.3.0; python_version < "3.4"

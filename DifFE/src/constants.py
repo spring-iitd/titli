@@ -1,0 +1,1 @@
+MAX_BITS_SIZE = 11

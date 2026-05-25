@@ -1,0 +1,17 @@
+{
+  "model_type": "lstm",
+  "input_size": 144,
+  "hidden_size": 128,
+  "num_layers": 3,
+  "output_size": 100,
+  "learning_rate": 0.001,
+  "batch_size": 64,
+  "epochs": 50,
+  "window_size": 10,
+  "patience": 10,
+  "min_delta": 0.001,
+  "activation": "none",
+  "seq_len": 250,
+  "weight_decay": 0.001,
+  "device": "cuda"
+}
